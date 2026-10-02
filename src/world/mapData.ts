@@ -42,6 +42,39 @@ export interface MapProp {
 
 const FIELD = { left: 7, right: 11, top: 6, bottom: 8 } as const;
 
+/** The tilled plot the player can work, in map-tile coordinates. */
+export const FIELD_GRID = {
+	column: FIELD.left,
+	row: FIELD.top,
+	columns: FIELD.right - FIELD.left + 1,
+	rows: FIELD.bottom - FIELD.top + 1,
+} as const;
+
+/** Field tile (0-based) to the world position of its center. */
+export function fieldTileToWorld(column: number, row: number): { x: number; y: number } {
+	return {
+		x: (FIELD_GRID.column + column) * TILE_SIZE + TILE_SIZE / 2,
+		y: (FIELD_GRID.row + row) * TILE_SIZE + TILE_SIZE / 2,
+	};
+}
+
+/** World position to a field tile, or null when outside the plot. */
+export function worldToFieldTile(x: number, y: number): { x: number; y: number } | null {
+	const column = Math.floor(x / TILE_SIZE) - FIELD_GRID.column;
+	const row = Math.floor(y / TILE_SIZE) - FIELD_GRID.row;
+
+	if (
+		column < 0 ||
+		row < 0 ||
+		column >= FIELD_GRID.columns ||
+		row >= FIELD_GRID.rows
+	) {
+		return null;
+	}
+
+	return { x: column, y: row };
+}
+
 /** Edit these rules to redraw the 64px terrain grid. */
 export function terrainAt(column: number, row: number): TerrainKey {
 	if (row === 11) return "water";

@@ -4,3 +4,18 @@ dist
 .DS_Store
 test-results
 playwright-report
+
+# Local auth/session config. .env.example is the committed template.
+.env
+.env.local
+.env.*.local
+*.sqlite
+*.sqlite3
+
+# Elixir / Mix
+backend/_build
+backend/deps
+backend/priv/static
+backend/*.tar
+backend/.elixir_ls
+erl_crash.dump

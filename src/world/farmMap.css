@@ -13,3 +13,72 @@
 	height: 100%;
 	image-rendering: pixelated;
 }
+
+.farm-map-bar {
+	position: absolute;
+	top: 0.75rem;
+	right: 0.75rem;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.35rem 0.6rem;
+	border: 1px solid rgba(58, 44, 30, 0.55);
+	border-radius: 0.375rem;
+	background: rgba(38, 28, 20, 0.82);
+	color: #f3e7d0;
+	font-size: 0.75rem;
+	letter-spacing: 0.05em;
+}
+
+.farm-map-user {
+	color: #a7c957;
+}
+
+.farm-map-signout {
+	color: #f3e7d0;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	text-underline-offset: 2px;
+}
+
+.farm-map-signout:hover {
+	color: #a7c957;
+	text-decoration: underline;
+}
+
+.farm-map-tools {
+	position: absolute;
+	bottom: 1rem;
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.4rem 0.6rem;
+	border: 1px solid rgba(58, 44, 30, 0.55);
+	border-radius: 0.375rem;
+	background: rgba(38, 28, 20, 0.82);
+}
+
+.farm-map-tool {
+	padding: 0.25rem 0.5rem;
+	border: 1px solid rgba(167, 201, 87, 0.5);
+	border-radius: 0.25rem;
+	background: transparent;
+	color: #f3e7d0;
+	font-size: 0.7rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.farm-map-tool-active {
+	border-color: #a7c957;
+	background: rgba(167, 201, 87, 0.2);
+	color: #a7c957;
+}
+
+.farm-map-hint {
+	color: #b9a98d;
+	font-size: 0.65rem;
+	letter-spacing: 0.05em;
+}
