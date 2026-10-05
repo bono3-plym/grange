@@ -26,19 +26,32 @@ export class EconomyManager {
   }
 
   private notify(): void {
-    this.listeners.forEach((callback) => callback(this.balance));
+    this.listeners.forEach((callback) => {
+      callback(this.balance);
+    });
   }
 
   /**
    * Validation logic for buying seeds, tools, or land.
    */
   canAfford(cost: number): boolean {
-    return this.balance >= cost;
+    return Number.isFinite(cost) && this.balance >= cost;
+  }
+
+  /**
+   * Rejects amounts that aren't finite, non-negative numbers. Without this,
+   * `sell(NaN)` would add NaN to the balance and corrupt every later total.
+   */
+  private validate(amount: number, label: string): string | null {
+    if (!Number.isFinite(amount)) return `${label} must be a finite number`;
+    if (amount < 0) return `${label} cannot be negative`;
+    return null;
   }
 
   buy(cost: number): TransactionResult {
-    if (cost < 0) {
-      return { success: false, balance: this.balance, error: "Cost cannot be negative" };
+    const error = this.validate(cost, "Cost");
+    if (error) {
+      return { success: false, balance: this.balance, error };
     }
     if (!this.canAfford(cost)) {
       return { success: false, balance: this.balance, error: "Insufficient funds" };
@@ -53,8 +66,9 @@ export class EconomyManager {
    * Logic for selling harvested crops or goods.
    */
   sell(earnings: number): TransactionResult {
-    if (earnings < 0) {
-      return { success: false, balance: this.balance, error: "Earnings cannot be negative" };
+    const error = this.validate(earnings, "Earnings");
+    if (error) {
+      return { success: false, balance: this.balance, error };
     }
 
     this.balance += earnings;

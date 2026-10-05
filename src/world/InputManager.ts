@@ -5,6 +5,7 @@ export interface InputVector {
 
 export class InputManager {
   private activeKeys = new Set<string>();
+  private pressedKeys = new Set<string>();
   private boundKeyDown: (e: KeyboardEvent) => void;
   private boundKeyUp: (e: KeyboardEvent) => void;
   private boundBlur: () => void;
@@ -14,6 +15,9 @@ export class InputManager {
       // Prevent browser scrolling on arrow keys or spacebar
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
         e.preventDefault();
+      }
+      if (!this.activeKeys.has(e.code)) {
+        this.pressedKeys.add(e.code);
       }
       this.activeKeys.add(e.code);
     };
@@ -25,6 +29,7 @@ export class InputManager {
     // Prevents "stuck keys" if the player Alt-Tabs or clicks away while pressing a key
     this.boundBlur = () => {
       this.activeKeys.clear();
+      this.pressedKeys.clear();
     };
 
     window.addEventListener('keydown', this.boundKeyDown);
@@ -37,6 +42,17 @@ export class InputManager {
    */
   isDown(code: string): boolean {
     return this.activeKeys.has(code);
+  }
+
+  /**
+   * Returns true once for a key press, then forgets it until the next press.
+   */
+  consumePressed(code: string): boolean {
+    if (this.pressedKeys.has(code)) {
+      this.pressedKeys.delete(code);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -70,5 +86,6 @@ export class InputManager {
     window.removeEventListener('keyup', this.boundKeyUp);
     window.removeEventListener('blur', this.boundBlur);
     this.activeKeys.clear();
+    this.pressedKeys.clear();
   }
 }

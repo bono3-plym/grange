@@ -36,3 +36,12 @@ test("the farm map is closed to visitors without a session", async ({ page }) =>
 		page.locator("canvas[aria-label^='Farm map']"),
 	).toHaveCount(0);
 });
+
+test("farm world shows the starting balance HUD", async ({ page }) => {
+	await resetServer();
+	await register(page, uniqueName("Sprout"));
+
+	const balance = page.getByTestId("farm-balance");
+	await expect(balance).toBeVisible();
+	await expect(balance).toContainText("100");
+});

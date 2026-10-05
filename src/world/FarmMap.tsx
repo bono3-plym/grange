@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { logout } from "../auth";
 import { emitLeaveFarm, emitVisitFarm } from "../socket";
 import { useGameStore } from "../store";
+import { FarmHUD } from "./FarmHUD";
 import { FarmMapScene } from "./FarmMapScene";
 import "./farmMap.css";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
@@ -88,6 +89,7 @@ export default function FarmMap() {
 				<span className="farm-map-user" data-testid="farm-map-user">
 					{username}
 				</span>
+				<FarmHUD />
 				<span data-testid="farm-map-tomatoes">
 					{farm?.tomatoes ?? 0} tomatoes
 				</span>

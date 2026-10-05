@@ -34,6 +34,15 @@
 	color: #a7c957;
 }
 
+.farm-map-balance {
+	color: #f3e7d0;
+	font-weight: 700;
+}
+
+.farm-map-balance-symbol {
+	color: #a7c957;
+}
+
 .farm-map-signout {
 	color: #f3e7d0;
 	text-transform: uppercase;
