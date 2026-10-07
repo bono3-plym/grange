@@ -2,7 +2,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { economy } from "./EconomyManager";
 
-export const FarmHUD: React.FC = () => {
+export const EconomyHUD: React.FC = () => {
   const [balance, setBalance] = useState<number>(economy.getBalance());
 
   useEffect(() => {

@@ -5,7 +5,7 @@ import type { FarmToolId } from "../../shared/farm";
 import { logout } from "../auth";
 import { emitLeaveFarm, emitVisitFarm } from "../socket";
 import { useGameStore } from "../store";
-import { FarmHUD } from "./FarmHUD";
+import { EconomyHUD } from "./EconomyHUD";
 import { FarmMapScene } from "./FarmMapScene";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
@@ -125,7 +125,7 @@ export default function FarmMap() {
 				<span className="farm-map-user" data-testid="farm-map-user">
 					{username}
 				</span>
-				<FarmHUD />
+				<EconomyHUD />
 				<span data-testid="farm-map-tomatoes">
 					{farm?.tomatoes ?? 0} tomatoes
 				</span>
