@@ -8,6 +8,14 @@ const image = (path: string) =>
 
 export const terrainImage = image("terrain.webp");
 
+export const sproutImage = image("plants/sprout.webp");
+export const tomatoPlantImage = image("plants/tomato-plant.webp");
+
+export const cropImages = {
+	sprout: sproutImage,
+	"tomato-plant": tomatoPlantImage,
+};
+
 export const propImages: Record<PropKey, ex.ImageSource> = {
 	farmhouse: image("buildings/farmhouse.webp"),
 	barn: image("buildings/barn.webp"),
@@ -26,7 +34,11 @@ export const propImages: Record<PropKey, ex.ImageSource> = {
 	"blue-flowers": image("plants/blue-flowers.webp"),
 };
 
-export const resources = [terrainImage, ...Object.values(propImages)];
+export const resources = [
+	terrainImage,
+	...Object.values(propImages),
+	...Object.values(cropImages),
+];
 
 export const terrainFrames: Record<
 	TerrainKey,

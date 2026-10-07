@@ -5,6 +5,8 @@ import {
 	MAP_ROWS,
 	MAP_WIDTH,
 	TILE_SIZE,
+	isTillableTile,
+	propBlocking,
 	props,
 	terrainAt,
 } from "./mapData";
@@ -23,12 +25,36 @@ describe("farm map data", () => {
 		}
 	});
 
-	it("starts the entire crop field with dry soil", () => {
+	it("starts the crop field as plantable grass", () => {
 		for (let row = 6; row <= 8; row += 1) {
 			for (let column = 7; column <= 11; column += 1) {
-				expect(terrainAt(column, row)).toBe("tilled-dry");
+				expect(isTillableTile(column, row)).toBe(true);
+				expect(terrainAt(column, row)).not.toBe("tilled-dry");
 			}
 		}
+	});
+
+	it("only allows hoeing on grass", () => {
+		expect(isTillableTile(0, 0)).toBe(true);
+		expect(isTillableTile(5, 4)).toBe(false);
+		expect(isTillableTile(4, 5)).toBe(false);
+		expect(isTillableTile(0, 10)).toBe(false);
+		expect(isTillableTile(0, 11)).toBe(false);
+	});
+
+	it("assigns a blocking rule to every prop", () => {
+		const assets = new Set(props.map((prop) => prop.asset));
+		for (const asset of assets) {
+			expect(propBlocking[asset]).toBeDefined();
+		}
+		expect(propBlocking["fence-horizontal"]).toBe("rect");
+		expect(propBlocking["fence-post"]).toBe("rect");
+		expect(propBlocking.farmhouse).toBe("rect");
+		expect(propBlocking.well).toBe("rect");
+		expect(propBlocking["oak-tree"]).toBe("base");
+		expect(propBlocking.daisies).toBe("none");
+		expect(propBlocking.marigolds).toBe("none");
+		expect(propBlocking["blue-flowers"]).toBe("none");
 	});
 
 	it("creates the main path intersection", () => {

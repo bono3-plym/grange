@@ -79,14 +79,6 @@ export function worldToFieldTile(x: number, y: number): { x: number; y: number }
 export function terrainAt(column: number, row: number): TerrainKey {
 	if (row === 11) return "water";
 	if (row === 10) return "shore-north";
-	if (
-		column >= FIELD.left &&
-		column <= FIELD.right &&
-		row >= FIELD.top &&
-		row <= FIELD.bottom
-	) {
-		return "tilled-dry";
-	}
 	if (column === 4 && row === 4) return "path-cross";
 	if (row === 4) return "path-horizontal";
 	if (column === 4 && row < 10) return "path-vertical";
@@ -94,6 +86,43 @@ export function terrainAt(column: number, row: number): TerrainKey {
 	if ((column * 3 + row * 11) % 8 === 0) return "grass-tufts";
 	return "grass";
 }
+
+/** Only grass-family tiles can be hoed. Paths, water, and shore are ignored. */
+export function isTillableTile(column: number, row: number): boolean {
+	const terrain = terrainAt(column, row);
+	return (
+		terrain === "grass" ||
+		terrain === "grass-tufts" ||
+		terrain === "grass-flowers"
+	);
+}
+
+/**
+ * How each prop blocks tools. Fences are flat, so their full displayed rect
+ * counts ("rect"). Buildings, trees, and furniture only block the ground
+ * row their base stands on ("base") — canopies may overhang hoeable grass.
+ * Flowers are decorative and stay tillable ("none"). Future props declare
+ * their rule here when they are added.
+ */
+export type PropBlockingRule = "rect" | "base" | "none";
+
+export const propBlocking: Record<PropKey, PropBlockingRule> = {
+	farmhouse: "rect",
+	barn: "rect",
+	"oak-tree": "base",
+	"pine-tree": "base",
+	"apple-tree": "base",
+	well: "rect",
+	bench: "rect",
+	sign: "rect",
+	barrel: "rect",
+	crate: "rect",
+	"fence-horizontal": "rect",
+	"fence-post": "rect",
+	daisies: "none",
+	marigolds: "none",
+	"blue-flowers": "none",
+};
 
 export const props: MapProp[] = [
 	{ asset: "farmhouse", x: 210, y: 260, width: 250 },

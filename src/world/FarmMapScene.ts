@@ -1,8 +1,15 @@
 import * as ex from "excalibur";
 import type { FarmTileState, FarmToolId } from "../../shared/farm";
-import type { FarmAction } from "../../shared/types";
+import { isFarmInBounds } from "../../shared/farm";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
+import {
+	BlockRegistry,
+	decorByTile,
+	groundFootprintTiles,
+	rectFootprintTiles,
+} from "./blocking";
+import { CropLayer } from "./cropLayer";
 import { InputManager } from "./InputManager";
 import {
 	MAP_COLUMNS,
@@ -10,44 +17,42 @@ import {
 	MAP_ROWS,
 	MAP_WIDTH,
 	TILE_SIZE,
-	fieldTileToWorld,
+	isTillableTile,
+	propBlocking,
 	props,
 	terrainAt,
-	worldToFieldTile,
 } from "./mapData";
 import { propImages, terrainFrames, terrainImage } from "./resources";
-
-const TILE_COLORS: Record<FarmTileState, ex.Color> = {
-	tilled: ex.Color.fromHex("#7a4a22"),
-	planted: ex.Color.fromHex("#8bc34a"),
-	watered: ex.Color.fromHex("#4a7fb5"),
-	ready: ex.Color.fromHex("#e0a020"),
-};
-
-const TOOL_KEYS: Record<string, FarmToolId> = {
-	Digit1: "hoe",
-	Digit2: "seed",
-	Digit3: "bucket",
-	Digit4: "scythe",
-};
-
-const TOOL_KIND: Record<FarmToolId, FarmAction["kind"]> = {
-	hoe: "till",
-	seed: "plant",
-	bucket: "water",
-	scythe: "harvest",
-};
-
-interface TileActor {
-	actor: ex.Actor;
-	state: FarmTileState;
-}
+import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
+import { TOOL_HINTS, TOOL_KEYS, TOOL_KIND } from "./farmTools";
+import { clearDecorAt, refreshTile } from "./tileSync";
 
 export class FarmMapScene extends ex.Scene {
+	onFarmUpdate: ((snapshot: FarmHudSnapshot) => void) | null = null;
+
 	private inputManager!: InputManager;
 	private player!: ex.Actor;
-	private readonly tiles = new Map<string, TileActor>();
 	private readonly playerSpeed = 160; // Pixels per second
+
+	private sheet!: ex.SpriteSheet;
+	private terrain!: ex.TileMap;
+	private readonly crops = new CropLayer(this);
+	// Growable set of tool-blocked tiles, seeded from props below. Future
+	// placeable fences will add/remove entries here at runtime.
+	private readonly blocks = new BlockRegistry();
+	// Created actors per prop index, so tilled-over decor can be removed.
+	private readonly propActors: Array<ex.Actor | undefined> = [];
+	private readonly decor = decorByTile(props);
+
+	// Last server tile states by field key, so only changed map tiles refresh.
+	private readonly synced = new Map<string, FarmTileState>();
+	private painting = false;
+	private readonly strokeTiles = new Set<string>();
+	private message = TOOL_HINTS.hoe;
+	private hovered: FarmHoveredTile | null = null;
+	private lastWorldPos: ex.Vector | null = null;
+	private deactivated = false;
+	private lastTomatoes = -1;
 
 	constructor(
 		private readonly owner: string,
@@ -56,12 +61,14 @@ export class FarmMapScene extends ex.Scene {
 		super();
 	}
 
-	override onInitialize(): void {
+	override onInitialize(engine: ex.Engine): void {
 		this.backgroundColor = ex.Color.fromHex("#79a44d");
 
+		// 1. Initialize standalone input listener
 		this.inputManager = new InputManager();
 
-		const sheet = ex.SpriteSheet.fromImageSource({
+		// 2. Build Terrain TileMap
+		this.sheet = ex.SpriteSheet.fromImageSource({
 			image: terrainImage,
 			grid: {
 				rows: 4,
@@ -71,7 +78,7 @@ export class FarmMapScene extends ex.Scene {
 			},
 		});
 
-		const terrain = new ex.TileMap({
+		this.terrain = new ex.TileMap({
 			pos: ex.vec(0, 0),
 			tileWidth: TILE_SIZE,
 			tileHeight: TILE_SIZE,
@@ -83,14 +90,15 @@ export class FarmMapScene extends ex.Scene {
 		for (let row = 0; row < MAP_ROWS; row += 1) {
 			for (let column = 0; column < MAP_COLUMNS; column += 1) {
 				const frame = terrainFrames[terrainAt(column, row)];
-				terrain
+				this.terrain
 					.getTile(column, row)
-					?.addGraphic(sheet.getSprite(frame.column, frame.row));
+					?.addGraphic(this.sheet.getSprite(frame.column, frame.row));
 			}
 		}
-		this.add(terrain);
+		this.add(this.terrain);
 
-		for (const prop of props) {
+		// 3. Populate Props and register their tool-blocked tiles
+		props.forEach((prop, index) => {
 			const source = propImages[prop.asset];
 			const sprite = source.toSprite();
 			const scale = prop.width / source.width;
@@ -103,91 +111,97 @@ export class FarmMapScene extends ex.Scene {
 			});
 			actor.graphics.use(sprite);
 			this.add(actor);
-		}
+			this.propActors[index] = actor;
 
+			const rule = propBlocking[prop.asset];
+			if (rule === "rect") {
+				this.blocks.add(
+					`prop-${index}`,
+					rectFootprintTiles(prop.x, prop.y, prop.width, source.height * scale),
+				);
+			} else if (rule === "base") {
+				this.blocks.add(
+					`prop-${index}`,
+					groundFootprintTiles(prop.x, prop.y, prop.width),
+				);
+			}
+		});
+
+		// 4. Create Player Actor
 		this.player = new ex.Actor({
 			pos: ex.vec(MAP_WIDTH / 2, MAP_HEIGHT / 2),
 			width: 32,
 			height: 32,
-			color: ex.Color.fromHex("#ffcc00"),
+			color: ex.Color.fromHex("#ffcc00"), // Yellow box placeholder or attach player sprite
 			anchor: ex.vec(0.5, 1),
 			z: 200,
 		});
 		this.add(this.player);
 
+		// 5. Tool input: click or drag to act on field tiles via the server
+		const pointers = engine.input.pointers;
+		pointers.primary.on("down", (evt) => {
+			if (this.deactivated) return;
+			this.painting = true;
+			this.strokeTiles.clear();
+			this.applyToolAt(evt.worldPos);
+		});
+		pointers.primary.on("move", (evt) => {
+			if (this.deactivated) return;
+			this.updateHover(evt.worldPos);
+			if (this.painting) this.applyToolAt(evt.worldPos);
+		});
+		pointers.primary.on("up", () => {
+			this.painting = false;
+			this.strokeTiles.clear();
+		});
+
+		// Center camera initially
 		this.camera.pos = ex.vec(MAP_WIDTH / 2, MAP_HEIGHT / 2);
+		this.message = TOOL_HINTS[useGameStore.getState().tool] ?? this.message;
+		this.emitHud();
+	}
+
+	setTool(tool: FarmToolId): void {
+		useGameStore.getState().setTool(tool);
+		this.message = TOOL_HINTS[tool];
+		this.emitHud();
 	}
 
 	override onPreUpdate(_engine: ex.Engine, _delta: number): void {
+		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
+
+		// Excalibur automatically applies delta-time to actor.vel
 		this.player.vel = ex.vec(dir.x * this.playerSpeed, dir.y * this.playerSpeed);
 
+		// Update player z-index based on Y position for depth sorting with props
 		this.player.z = 100 + Math.floor(this.player.pos.y);
+
+		// Clamp player inside map boundaries
 		this.player.pos.x = Math.max(16, Math.min(MAP_WIDTH - 16, this.player.pos.x));
 		this.player.pos.y = Math.max(32, Math.min(MAP_HEIGHT, this.player.pos.y));
 
+		// Smoothly lock camera to player
 		this.camera.pos = this.player.pos;
 
-		this.syncTiles();
 		this.handleToolKeys();
+		this.syncTilesFromServer();
 	}
 
 	override onDeactivate(): void {
+		// Clean up DOM listeners when scene changes or unmounts
+		this.deactivated = true;
+		this.painting = false;
 		this.inputManager?.destroy();
-	}
-
-	private syncTiles(): void {
-		const farm = useGameStore.getState().activeFarm;
-		const live = new Set<string>();
-
-		if (farm) {
-			for (const tile of farm.tiles) {
-				const key = `${tile.x},${tile.y}`;
-				live.add(key);
-				const existing = this.tiles.get(key);
-
-				if (existing && existing.state === tile.state) continue;
-
-				const { x, y } = fieldTileToWorld(tile.x, tile.y);
-				const actor =
-					existing?.actor ??
-					new ex.Actor({
-						pos: ex.vec(x, y),
-						width: 44,
-						height: 44,
-						anchor: ex.vec(0.5, 0.5),
-						z: 50,
-					});
-
-				actor.graphics.use(
-					new ex.Rectangle({
-						width: 44,
-						height: 44,
-						color: TILE_COLORS[tile.state],
-					}),
-				);
-
-				if (!existing) {
-					this.add(actor);
-					this.tiles.set(key, { actor, state: tile.state });
-				} else {
-					existing.state = tile.state;
-				}
-			}
-		}
-
-		for (const [key, tile] of this.tiles) {
-			if (!live.has(key)) {
-				tile.actor.kill();
-				this.tiles.delete(key);
-			}
-		}
 	}
 
 	private handleToolKeys(): void {
 		for (const [key, tool] of Object.entries(TOOL_KEYS)) {
 			if (this.inputManager.consumePressed(key)) {
 				useGameStore.getState().setTool(tool);
+				this.message = TOOL_HINTS[tool];
+				this.emitHud();
 			}
 		}
 
@@ -197,14 +211,130 @@ export class FarmMapScene extends ex.Scene {
 	}
 
 	private actOnPlayerTile(): void {
-		const tile = worldToFieldTile(this.player.pos.x, this.player.pos.y);
-		if (!tile) return;
-
+		const column = Math.floor(this.player.pos.x / TILE_SIZE);
+		const row = Math.floor(this.player.pos.y / TILE_SIZE);
+		if (!isFarmInBounds(column, row)) return;
 		const tool = useGameStore.getState().tool;
 		emitFarmAction(this.owner, {
 			kind: TOOL_KIND[tool],
-			x: tile.x,
-			y: tile.y,
+			x: column,
+			y: row,
+		});
+	}
+
+	private applyToolAt(worldPos: ex.Vector): void {
+		const column = Math.floor(worldPos.x / TILE_SIZE);
+		const row = Math.floor(worldPos.y / TILE_SIZE);
+		if (column < 0 || row < 0 || column >= MAP_COLUMNS || row >= MAP_ROWS) return;
+
+		const strokeKey = `${column},${row}`;
+		this.updateHover(worldPos);
+		if (this.strokeTiles.has(strokeKey)) return;
+		this.strokeTiles.add(strokeKey);
+
+		if (!this.isOwner) {
+			this.message = "Visitors can't farm here.";
+			this.emitHud();
+			return;
+		}
+
+		if (this.blocks.isBlocked(column, row)) {
+			this.message = "Something is in the way.";
+			this.emitHud();
+			return;
+		}
+
+		const tool = useGameStore.getState().tool;
+		if (tool === "hoe") {
+			if (!isTillableTile(column, row)) {
+				this.message = "Hoe only works on grass.";
+				this.emitHud();
+				return;
+			}
+			if (!isFarmInBounds(column, row)) {
+				this.message = "Too far out to farm.";
+				this.emitHud();
+				return;
+			}
+		} else if (!isFarmInBounds(column, row)) {
+			this.message = "Too far out to farm.";
+			this.emitHud();
+			return;
+		}
+
+		emitFarmAction(this.owner, {
+			kind: TOOL_KIND[tool],
+			x: column,
+			y: row,
+		});
+	}
+
+	/** Reconciles server tiles into terrain + crop visuals. Server tiles use
+	 * map coordinates directly so open-map hoeing (blocking, decor, hover)
+	 * keeps working against the Phoenix backend. */
+	private syncTilesFromServer(): void {
+		const farm = useGameStore.getState().activeFarm;
+		const live = new Set<string>();
+		let changed = false;
+
+		if (farm) {
+			for (const tile of farm.tiles) {
+				const key = `${tile.x},${tile.y}`;
+				live.add(key);
+				if (this.synced.get(key) === tile.state) continue;
+				this.synced.set(key, tile.state);
+				refreshTile(this.terrain, this.sheet, this.crops, tile.x, tile.y, tile.state);
+				clearDecorAt(this.decor, this.propActors, props, key);
+				changed = true;
+			}
+			if (farm.tomatoes !== this.lastTomatoes) {
+				this.lastTomatoes = farm.tomatoes;
+				changed = true;
+			}
+		}
+
+		for (const key of [...this.synced.keys()]) {
+			if (!live.has(key)) {
+				const [fx, fy] = key.split(",").map(Number);
+				refreshTile(this.terrain, this.sheet, this.crops, fx, fy, undefined);
+				this.synced.delete(key);
+				changed = true;
+			}
+		}
+
+		if (changed) {
+			// The hover readout snapshots tile state, so recompute it after
+			// server flips or it would keep showing a stale state until the
+			// next pointer move.
+			if (this.lastWorldPos) this.updateHover(this.lastWorldPos);
+			else this.emitHud();
+		}
+	}
+
+	private updateHover(worldPos: ex.Vector): void {
+		this.lastWorldPos = worldPos.clone();
+		const column = Math.floor(worldPos.x / TILE_SIZE);
+		const row = Math.floor(worldPos.y / TILE_SIZE);
+		if (column < 0 || row < 0 || column >= MAP_COLUMNS || row >= MAP_ROWS) {
+			this.hovered = null;
+		} else {
+			const farm = useGameStore.getState().activeFarm;
+			const stored = farm?.tiles.find((t) => t.x === column && t.y === row);
+			this.hovered = {
+				column,
+				row,
+				state: stored?.state ?? terrainAt(column, row),
+			};
+		}
+		this.emitHud();
+	}
+
+	private emitHud(): void {
+		const farm = useGameStore.getState().activeFarm;
+		this.onFarmUpdate?.({
+			tomatoes: farm?.tomatoes ?? 0,
+			message: this.message,
+			hovered: this.hovered,
 		});
 	}
 }
