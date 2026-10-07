@@ -1,91 +1,70 @@
 export interface InputVector {
-  x: number;
-  y: number;
+	x: number;
+	y: number;
 }
 
 export class InputManager {
-  private activeKeys = new Set<string>();
-  private pressedKeys = new Set<string>();
-  private boundKeyDown: (e: KeyboardEvent) => void;
-  private boundKeyUp: (e: KeyboardEvent) => void;
-  private boundBlur: () => void;
+	private readonly activeKeys = new Set<string>();
+	private readonly pressedKeys = new Set<string>();
+	private readonly boundKeyDown: (event: KeyboardEvent) => void;
+	private readonly boundKeyUp: (event: KeyboardEvent) => void;
+	private readonly boundBlur: () => void;
 
-  constructor() {
-    this.boundKeyDown = (e: KeyboardEvent) => {
-      // Prevent browser scrolling on arrow keys or spacebar
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
-        e.preventDefault();
-      }
-      if (!this.activeKeys.has(e.code)) {
-        this.pressedKeys.add(e.code);
-      }
-      this.activeKeys.add(e.code);
-    };
+	constructor() {
+		this.boundKeyDown = (event) => {
+			if (
+				["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(
+					event.code,
+				)
+			) {
+				event.preventDefault();
+			}
+			if (!this.activeKeys.has(event.code)) this.pressedKeys.add(event.code);
+			this.activeKeys.add(event.code);
+		};
 
-    this.boundKeyUp = (e: KeyboardEvent) => {
-      this.activeKeys.delete(e.code);
-    };
+		this.boundKeyUp = (event) => {
+			this.activeKeys.delete(event.code);
+		};
 
-    // Prevents "stuck keys" if the player Alt-Tabs or clicks away while pressing a key
-    this.boundBlur = () => {
-      this.activeKeys.clear();
-      this.pressedKeys.clear();
-    };
+		this.boundBlur = () => {
+			this.activeKeys.clear();
+			this.pressedKeys.clear();
+		};
 
-    window.addEventListener('keydown', this.boundKeyDown);
-    window.addEventListener('keyup', this.boundKeyUp);
-    window.addEventListener('blur', this.boundBlur);
-  }
+		window.addEventListener("keydown", this.boundKeyDown);
+		window.addEventListener("keyup", this.boundKeyUp);
+		window.addEventListener("blur", this.boundBlur);
+	}
 
-  /**
-   * Check if a specific key is currently held down.
-   */
-  isDown(code: string): boolean {
-    return this.activeKeys.has(code);
-  }
+	getMovementVector(): InputVector {
+		let x = 0;
+		let y = 0;
+		if (this.activeKeys.has("KeyA") || this.activeKeys.has("ArrowLeft")) x -= 1;
+		if (this.activeKeys.has("KeyD") || this.activeKeys.has("ArrowRight"))
+			x += 1;
+		if (this.activeKeys.has("KeyW") || this.activeKeys.has("ArrowUp")) y -= 1;
+		if (this.activeKeys.has("KeyS") || this.activeKeys.has("ArrowDown")) y += 1;
 
-  /**
-   * Returns true once for a key press, then forgets it until the next press.
-   */
-  consumePressed(code: string): boolean {
-    if (this.pressedKeys.has(code)) {
-      this.pressedKeys.delete(code);
-      return true;
-    }
-    return false;
-  }
+		const length = Math.hypot(x, y);
+		return length > 0 ? { x: x / length, y: y / length } : { x, y };
+	}
 
-  /**
-   * Returns a normalized 2D direction vector (-1 to 1).
-   * Supports both WASD and Arrow Keys.
-   */
-  getMovementVector(): InputVector {
-    let x = 0;
-    let y = 0;
+	consumePressed(code: string): boolean {
+		return this.consumePress(code);
+	}
 
-    if (this.activeKeys.has('KeyA') || this.activeKeys.has('ArrowLeft'))  x -= 1;
-    if (this.activeKeys.has('KeyD') || this.activeKeys.has('ArrowRight')) x += 1;
-    if (this.activeKeys.has('KeyW') || this.activeKeys.has('ArrowUp'))    y -= 1;
-    if (this.activeKeys.has('KeyS') || this.activeKeys.has('ArrowDown'))  y += 1;
+	consumePress(...codes: string[]): boolean {
+		const pressed = codes.some((code) => this.pressedKeys.has(code));
+		for (const code of codes) this.pressedKeys.delete(code);
+		return pressed;
+	}
 
-    // Normalize diagonal movement so diagonals aren't 1.414x faster
-    const length = Math.hypot(x, y);
-    if (length > 0) {
-      x /= length;
-      y /= length;
-    }
-
-    return { x, y };
-  }
-
-  /**
-   * Clean up event listeners when unmounting or stopping the scene.
-   */
-  destroy(): void {
-    window.removeEventListener('keydown', this.boundKeyDown);
-    window.removeEventListener('keyup', this.boundKeyUp);
-    window.removeEventListener('blur', this.boundBlur);
-    this.activeKeys.clear();
-    this.pressedKeys.clear();
-  }
+	destroy(): void {
+		window.removeEventListener("keydown", this.boundKeyDown);
+		window.removeEventListener("keyup", this.boundKeyUp);
+		window.removeEventListener("blur", this.boundBlur);
+		this.activeKeys.clear();
+		this.pressedKeys.clear();
+	}
 }

@@ -14,7 +14,7 @@ export default defineConfig({
 	webServer: {
 		// Phoenix serves the built SPA (from backend/priv/static), so e2e
 		// exercises the real production request path with no Vite involved.
-		command: "bash -c 'cd backend && exec mix phx.server'",
+		command: "node scripts/run-mix.mjs phx.server",
 		url: BASE_URL,
 		reuseExistingServer: true,
 		timeout: 120_000,

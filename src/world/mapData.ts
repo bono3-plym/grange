@@ -31,7 +31,8 @@ export type PropKey =
 	| "fence-post"
 	| "daisies"
 	| "marigolds"
-	| "blue-flowers";
+	| "blue-flowers"
+	| "starter-train";
 
 export interface MapProp {
 	asset: PropKey;
@@ -51,7 +52,10 @@ export const FIELD_GRID = {
 } as const;
 
 /** Field tile (0-based) to the world position of its center. */
-export function fieldTileToWorld(column: number, row: number): { x: number; y: number } {
+export function fieldTileToWorld(
+	column: number,
+	row: number,
+): { x: number; y: number } {
 	return {
 		x: (FIELD_GRID.column + column) * TILE_SIZE + TILE_SIZE / 2,
 		y: (FIELD_GRID.row + row) * TILE_SIZE + TILE_SIZE / 2,
@@ -59,7 +63,10 @@ export function fieldTileToWorld(column: number, row: number): { x: number; y: n
 }
 
 /** World position to a field tile, or null when outside the plot. */
-export function worldToFieldTile(x: number, y: number): { x: number; y: number } | null {
+export function worldToFieldTile(
+	x: number,
+	y: number,
+): { x: number; y: number } | null {
 	const column = Math.floor(x / TILE_SIZE) - FIELD_GRID.column;
 	const row = Math.floor(y / TILE_SIZE) - FIELD_GRID.row;
 
@@ -74,6 +81,9 @@ export function worldToFieldTile(x: number, y: number): { x: number; y: number }
 
 	return { x: column, y: row };
 }
+
+export const FARM_PLAYER_SPAWN = { x: 576, y: 620 } as const;
+export const FARM_TRAIN_STOP = { x: 810, y: 600 } as const;
 
 /** Edit these rules to redraw the 64px terrain grid. */
 export function terrainAt(column: number, row: number): TerrainKey {
@@ -122,13 +132,14 @@ export const propBlocking: Record<PropKey, PropBlockingRule> = {
 	daisies: "none",
 	marigolds: "none",
 	"blue-flowers": "none",
+	"starter-train": "rect",
 };
 
 export const props: MapProp[] = [
 	{ asset: "farmhouse", x: 210, y: 260, width: 250 },
 	{ asset: "barn", x: 935, y: 270, width: 270 },
 	{ asset: "well", x: 200, y: 400, width: 96 },
-	{ asset: "bench", x: 900, y: 610, width: 96 },
+	{ asset: "bench", x: 305, y: 625, width: 96 },
 	{ asset: "sign", x: 395, y: 400, width: 54 },
 	{ asset: "barrel", x: 845, y: 332, width: 54 },
 	{ asset: "crate", x: 895, y: 336, width: 58 },
@@ -138,7 +149,7 @@ export const props: MapProp[] = [
 	{ asset: "apple-tree", x: 670, y: 190, width: 128 },
 	{ asset: "oak-tree", x: 1085, y: 185, width: 130 },
 	{ asset: "pine-tree", x: 95, y: 610, width: 120 },
-	{ asset: "apple-tree", x: 1070, y: 625, width: 130 },
+	{ asset: "starter-train", x: 960, y: 625, width: 340 },
 
 	{ asset: "daisies", x: 330, y: 225, width: 52 },
 	{ asset: "marigolds", x: 750, y: 225, width: 52 },

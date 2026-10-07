@@ -5,12 +5,21 @@ import type { FarmToolId } from "../../shared/farm";
 import { logout } from "../auth";
 import { emitLeaveFarm, emitVisitFarm } from "../socket";
 import { useGameStore } from "../store";
+import { CasinoScene } from "./CasinoScene";
+import { casinoResources } from "./casinoResources";
 import { EconomyHUD } from "./EconomyHUD";
 import { FarmMapScene } from "./FarmMapScene";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
+import { MarketplaceScene } from "./MarketplaceScene";
+import { marketplaceResources } from "./marketplaceResources";
 import { resources } from "./resources";
+import type { WorldArea } from "./WalkingScene";
+
+const worldResources = [
+	...new Set([...resources, ...marketplaceResources, ...casinoResources]),
+];
 
 const TOOLS: Array<{ id: FarmToolId; label: string; key: string }> = [
 	{ id: "hoe", label: "Hoe", key: "1" },
@@ -57,6 +66,8 @@ export default function FarmMap() {
 
 		return () => emitLeaveFarm();
 	}, [target, navigate]);
+	const [area, setArea] = useState<WorldArea>("Farm");
+	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -73,11 +84,16 @@ export default function FarmMap() {
 			backgroundColor: ex.Color.fromHex("#79a44d"),
 		});
 
-		const scene = new FarmMapScene(target, isOwner);
+		const scene = new FarmMapScene(target, isOwner, setTravelPrompt, setArea);
 		scene.onFarmUpdate = (snapshot) => setHud(snapshot);
 		sceneRef.current = scene;
 		engine.addScene("farm-map", scene);
-		void Promise.all(resources.map((resource) => resource.load())).then(
+		engine.addScene(
+			"marketplace",
+			new MarketplaceScene(setTravelPrompt, setArea),
+		);
+		engine.addScene("casino", new CasinoScene(setTravelPrompt, setArea));
+		void Promise.all(worldResources.map((resource) => resource.load())).then(
 			async () => {
 				if (cancelled) return;
 				await engine.start();
@@ -116,8 +132,13 @@ export default function FarmMap() {
 			<canvas
 				ref={canvasRef}
 				className="farm-map-canvas"
-				aria-label="Farm map. Press 1-4 to switch tools, then click a tile."
+				aria-label={`${area} map. Use WASD or arrow keys to walk.`}
 			/>
+			{travelPrompt && (
+				<div className="farm-map-travel-prompt" data-testid="travel-prompt">
+					{travelPrompt}
+				</div>
+			)}
 			<div className="farm-map-bar">
 				<span data-testid="farm-map-owner">
 					{isOwner ? "Your farm" : `${target}'s farm`}
@@ -144,39 +165,46 @@ export default function FarmMap() {
 					Sign out
 				</button>
 			</div>
-			<div className="farm-hud" data-testid="farm-hud">
-				{isOwner ? (
-					<div className="farm-tools" role="toolbar" aria-label="Farming tools">
-						{TOOLS.map((entry) => (
-							<button
-								key={entry.id}
-								type="button"
-								data-testid={`tool-${entry.id}`}
-								aria-pressed={tool === entry.id}
-								className={
-									tool === entry.id
-										? "farm-tool farm-tool-active"
-										: "farm-tool"
-								}
-								onClick={() => setTool(entry.id)}
-							>
-								<span className="farm-tool-key">{entry.key}</span> {entry.label}
-							</button>
-						))}
+			{area === "Farm" && (
+				<div className="farm-hud" data-testid="farm-hud">
+					{isOwner ? (
+						<div
+							className="farm-tools"
+							role="toolbar"
+							aria-label="Farming tools"
+						>
+							{TOOLS.map((entry) => (
+								<button
+									key={entry.id}
+									type="button"
+									data-testid={`tool-${entry.id}`}
+									aria-pressed={tool === entry.id}
+									className={
+										tool === entry.id
+											? "farm-tool farm-tool-active"
+											: "farm-tool"
+									}
+									onClick={() => setTool(entry.id)}
+								>
+									<span className="farm-tool-key">{entry.key}</span>{" "}
+									{entry.label}
+								</button>
+							))}
+						</div>
+					) : null}
+					<div className="farm-status">
+						<span data-testid="farm-tomatoes">🍅 {hud.tomatoes}</span>
+						<span data-testid="farm-tile">
+							{hud.hovered
+								? `(${hud.hovered.column}, ${hud.hovered.row}): ${hud.hovered.state}`
+								: "—"}
+						</span>
 					</div>
-				) : null}
-				<div className="farm-status">
-					<span data-testid="farm-tomatoes">🍅 {hud.tomatoes}</span>
-					<span data-testid="farm-tile">
-						{hud.hovered
-							? `(${hud.hovered.column}, ${hud.hovered.row}): ${hud.hovered.state}`
-							: "—"}
-					</span>
+					<p className="farm-hint" data-testid="farm-hint">
+						{hud.message}
+					</p>
 				</div>
-				<p className="farm-hint" data-testid="farm-hint">
-					{hud.message}
-				</p>
-			</div>
+			)}
 		</main>
 	);
 }

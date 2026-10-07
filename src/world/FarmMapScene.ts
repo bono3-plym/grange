@@ -10,8 +10,10 @@ import {
 	rectFootprintTiles,
 } from "./blocking";
 import { CropLayer } from "./cropLayer";
+import { FarmTravel } from "./FarmTravel";
 import { InputManager } from "./InputManager";
 import {
+	FARM_PLAYER_SPAWN,
 	MAP_COLUMNS,
 	MAP_HEIGHT,
 	MAP_ROWS,
@@ -23,9 +25,11 @@ import {
 	terrainAt,
 } from "./mapData";
 import { propImages, terrainFrames, terrainImage } from "./resources";
+import { updateWalkingPlayer } from "./playerMovement";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
 import { TOOL_HINTS, TOOL_KEYS, TOOL_KIND } from "./farmTools";
 import { clearDecorAt, refreshTile } from "./tileSync";
+import type { WorldArea } from "./WalkingScene";
 
 export class FarmMapScene extends ex.Scene {
 	onFarmUpdate: ((snapshot: FarmHudSnapshot) => void) | null = null;
@@ -53,12 +57,16 @@ export class FarmMapScene extends ex.Scene {
 	private lastWorldPos: ex.Vector | null = null;
 	private deactivated = false;
 	private lastTomatoes = -1;
+	private readonly travel: FarmTravel;
 
 	constructor(
 		private readonly owner: string,
 		private readonly isOwner: boolean,
+		onPromptChange: (prompt: string | null) => void,
+		onAreaChange: (area: WorldArea) => void,
 	) {
 		super();
+		this.travel = new FarmTravel(onPromptChange, onAreaChange);
 	}
 
 	override onInitialize(engine: ex.Engine): void {
@@ -129,7 +137,7 @@ export class FarmMapScene extends ex.Scene {
 
 		// 4. Create Player Actor
 		this.player = new ex.Actor({
-			pos: ex.vec(MAP_WIDTH / 2, MAP_HEIGHT / 2),
+			pos: ex.vec(FARM_PLAYER_SPAWN.x, FARM_PLAYER_SPAWN.y),
 			width: 32,
 			height: 32,
 			color: ex.Color.fromHex("#ffcc00"), // Yellow box placeholder or attach player sprite
@@ -168,22 +176,19 @@ export class FarmMapScene extends ex.Scene {
 		this.emitHud();
 	}
 
-	override onPreUpdate(_engine: ex.Engine, _delta: number): void {
+	override onActivate(): void {
+		if (this.deactivated) this.inputManager = new InputManager();
+		this.deactivated = false;
+		this.travel.activate();
+	}
+
+	override onPreUpdate(engine: ex.Engine, _delta: number): void {
 		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
 
-		// Excalibur automatically applies delta-time to actor.vel
-		this.player.vel = ex.vec(dir.x * this.playerSpeed, dir.y * this.playerSpeed);
+		updateWalkingPlayer(this.player, dir, this.playerSpeed);
 
-		// Update player z-index based on Y position for depth sorting with props
-		this.player.z = 100 + Math.floor(this.player.pos.y);
-
-		// Clamp player inside map boundaries
-		this.player.pos.x = Math.max(16, Math.min(MAP_WIDTH - 16, this.player.pos.x));
-		this.player.pos.y = Math.max(32, Math.min(MAP_HEIGHT, this.player.pos.y));
-
-		// Smoothly lock camera to player
-		this.camera.pos = this.player.pos;
+		this.travel.update(this.player, this.inputManager, engine);
 
 		this.handleToolKeys();
 		this.syncTilesFromServer();
@@ -194,6 +199,7 @@ export class FarmMapScene extends ex.Scene {
 		this.deactivated = true;
 		this.painting = false;
 		this.inputManager?.destroy();
+		this.travel.deactivate();
 	}
 
 	private handleToolKeys(): void {
@@ -225,7 +231,8 @@ export class FarmMapScene extends ex.Scene {
 	private applyToolAt(worldPos: ex.Vector): void {
 		const column = Math.floor(worldPos.x / TILE_SIZE);
 		const row = Math.floor(worldPos.y / TILE_SIZE);
-		if (column < 0 || row < 0 || column >= MAP_COLUMNS || row >= MAP_ROWS) return;
+		if (column < 0 || row < 0 || column >= MAP_COLUMNS || row >= MAP_ROWS)
+			return;
 
 		const strokeKey = `${column},${row}`;
 		this.updateHover(worldPos);
@@ -283,7 +290,14 @@ export class FarmMapScene extends ex.Scene {
 				live.add(key);
 				if (this.synced.get(key) === tile.state) continue;
 				this.synced.set(key, tile.state);
-				refreshTile(this.terrain, this.sheet, this.crops, tile.x, tile.y, tile.state);
+				refreshTile(
+					this.terrain,
+					this.sheet,
+					this.crops,
+					tile.x,
+					tile.y,
+					tile.state,
+				);
 				clearDecorAt(this.decor, this.propActors, props, key);
 				changed = true;
 			}

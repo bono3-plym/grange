@@ -14,6 +14,22 @@
 	image-rendering: pixelated;
 }
 
+.farm-map-travel-prompt {
+	position: absolute;
+	bottom: 1.25rem;
+	left: 50%;
+	transform: translateX(-50%);
+	padding: 0.65rem 1rem;
+	border: 2px solid #6e4b27;
+	border-radius: 0.5rem;
+	background: rgba(35, 25, 17, 0.9);
+	color: #fff3cf;
+	font-size: 0.9rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	pointer-events: none;
+}
+
 .farm-map-bar {
 	position: absolute;
 	top: 0.75rem;

@@ -188,12 +188,10 @@ defmodule Grange.Accounts do
 
   defp hash(password), do: Argon2.hash_pwd_salt(to_string(password), hash_opts())
 
+  # Read from app config instead of Mix.env() so releases (where Mix is not
+  # available at runtime) don't crash on register/login.
   defp hash_opts do
-    if Mix.env() == :test do
-      [t_cost: 1, m_cost: 8, parallelism: 1]
-    else
-      []
-    end
+    Application.get_env(:grange, :argon2_opts, [])
   end
 
   defp hash_token(token), do: :crypto.hash(:sha256, token) |> Base.encode16(case: :lower)

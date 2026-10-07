@@ -4,22 +4,22 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "setup": "pnpm install && cd backend && mix deps.get",
+		"setup": "pnpm install && node scripts/run-mix.mjs deps.get",
     "dev": "concurrently -k -n backend,web -c blue,magenta \"pnpm dev:backend\" \"pnpm dev:web\"",
-    "dev:backend": "cd backend && mix phx.server",
+		"dev:backend": "node scripts/run-mix.mjs phx.server",
     "dev:web": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
-    "test:backend": "cd backend && mix test",
+		"test:backend": "node scripts/run-mix.mjs test",
     "test:e2e": "vite build && playwright test",
     "test:e2e:install": "playwright install chromium",
     "lint": "biome lint && node scripts/max-lines.mjs && pnpm sanity",
-    "lint:backend": "cd backend && mix format --check-formatted && mix credo --strict",
+		"lint:backend": "node scripts/run-mix.mjs format --check-formatted && node scripts/run-mix.mjs credo --strict",
     "sanity": "node scripts/repo-sanity.mjs",
     "check": "pnpm lint && pnpm test && pnpm test:backend && pnpm build",
     "format": "biome format --write",
-    "start": "cd backend && mix phx.server"
+		"start": "node scripts/run-mix.mjs phx.server"
   },
   "dependencies": {
     "@fontsource/rye": "^5.3.0",

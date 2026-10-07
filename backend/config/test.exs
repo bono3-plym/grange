@@ -7,3 +7,7 @@ config :grange, GrangeWeb.Endpoint,
 
 config :grange, enable_test_routes: true
 config :logger, level: :warning
+
+# Fast, insecure Argon2 parameters for tests only. Prod/dev use the library
+# defaults (empty opts) for real password hashing strength.
+config :grange, :argon2_opts, t_cost: 1, m_cost: 8, parallelism: 1

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	FARM_TRAIN_STOP,
 	MAP_COLUMNS,
 	MAP_HEIGHT,
 	MAP_ROWS,
@@ -71,5 +72,13 @@ describe("farm map data", () => {
 			expect(prop.y).toBeGreaterThanOrEqual(0);
 			expect(prop.y).toBeLessThanOrEqual(MAP_HEIGHT);
 		}
+	});
+
+	it("includes a starter train with an in-bounds interaction point", () => {
+		expect(props.some((prop) => prop.asset === "starter-train")).toBe(true);
+		expect(FARM_TRAIN_STOP.x).toBeGreaterThanOrEqual(0);
+		expect(FARM_TRAIN_STOP.x).toBeLessThanOrEqual(MAP_WIDTH);
+		expect(FARM_TRAIN_STOP.y).toBeGreaterThanOrEqual(0);
+		expect(FARM_TRAIN_STOP.y).toBeLessThanOrEqual(MAP_HEIGHT);
 	});
 });
