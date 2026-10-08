@@ -1,18 +1,21 @@
 defmodule Grange.User do
   @moduledoc "A registered account. The password hash never leaves the server."
 
-  @derive {Jason.Encoder, only: [:id, :username, :email, :inserted_at]}
-  defstruct [:id, :username, :email, :password_hash, :inserted_at]
+  @starting_balance 100
+
+  @derive {Jason.Encoder, only: [:id, :username, :email, :inserted_at, :balance]}
+  defstruct [:id, :username, :email, :password_hash, :inserted_at, :balance]
 
   @type t :: %__MODULE__{
           id: String.t(),
           username: String.t(),
           email: String.t(),
           password_hash: String.t(),
-          inserted_at: String.t()
+          inserted_at: String.t(),
+          balance: non_neg_integer()
         }
 
-  @doc "Builds a new user with a generated id and timestamp."
+  @doc "Builds a new user with a generated id, timestamp, and opening balance."
   @spec new(map()) :: t()
   def new(attrs) do
     %__MODULE__{
@@ -20,7 +23,8 @@ defmodule Grange.User do
       username: attrs.username,
       email: attrs.email,
       password_hash: attrs.password_hash,
-      inserted_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      inserted_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+      balance: @starting_balance
     }
   end
 

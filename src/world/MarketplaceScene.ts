@@ -44,7 +44,7 @@ export class MarketplaceScene extends WalkingScene {
 					),
 					prompt: "Press E or Enter to enter the seed market",
 					radius: 95,
-					onInteract: () => onOpenMarket("seed"),
+					action: () => onOpenMarket("seed"),
 				},
 				{
 					position: ex.vec(
@@ -53,7 +53,7 @@ export class MarketplaceScene extends WalkingScene {
 					),
 					prompt: "Press E or Enter to enter the produce market",
 					radius: 95,
-					onInteract: () => onOpenMarket("produce"),
+					action: () => onOpenMarket("produce"),
 				},
 			],
 			onAreaChange,

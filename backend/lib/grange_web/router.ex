@@ -22,6 +22,8 @@ defmodule GrangeWeb.Router do
     post("/auth/logout", AuthController, :logout)
     get("/auth/me", AuthController, :me)
 
+    post("/economy/transaction", EconomyController, :transaction)
+
     get("/state", HealthController, :state)
 
     # Test hook: lets e2e runs start from a clean slate. Compiled out of

@@ -41,6 +41,11 @@ defmodule Grange.Accounts do
   @spec list_users() :: [User.t()]
   def list_users, do: GenServer.call(__MODULE__, :list_users)
 
+  @spec apply_balance_delta(String.t(), integer()) ::
+          {:ok, non_neg_integer()} | {:error, String.t()}
+  def apply_balance_delta(user_id, delta),
+    do: GenServer.call(__MODULE__, {:apply_balance_delta, user_id, delta})
+
   @spec reset() :: :ok
   def reset, do: GenServer.call(__MODULE__, :reset)
 
@@ -126,6 +131,16 @@ defmodule Grange.Accounts do
     {:reply, users, state}
   end
 
+  def handle_call({:apply_balance_delta, user_id, delta}, _from, state) do
+    case Map.get(state.users, user_id) do
+      nil ->
+        {:reply, {:error, "unknown user"}, state}
+
+      %User{} = user ->
+        update_balance(state, user, delta)
+    end
+  end
+
   def handle_call(:reset, _from, _state) do
     {:reply, :ok, %{users: %{}, by_username: %{}, by_email: %{}, sessions: %{}}}
   end
@@ -140,6 +155,21 @@ defmodule Grange.Accounts do
       end
     end
   end
+
+  # Applies a spend/earn delta, clamping at zero, and returns the new balance.
+  defp update_balance(state, user, delta) do
+    case validate_delta(delta) do
+      :ok ->
+        balance = max(0, user.balance + delta)
+        {:reply, {:ok, balance}, put_user(state, %{user | balance: balance})}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  defp validate_delta(delta) when is_integer(delta), do: :ok
+  defp validate_delta(_delta), do: {:error, "delta must be an integer"}
 
   defp put_user(state, user) do
     %{

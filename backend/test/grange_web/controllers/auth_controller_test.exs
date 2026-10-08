@@ -120,6 +120,47 @@ defmodule GrangeWeb.AuthControllerTest do
            |> String.contains?("application/json")
   end
 
+  test "register, login, and me report the opening balance" do
+    conn = register()
+    assert %{"user" => %{"balance" => 100}} = json_response(conn, 201)
+
+    me = conn |> recycle() |> get("/api/auth/me")
+    assert %{"user" => %{"balance" => 100}} = json_response(me, 200)
+
+    login =
+      json_post(build_conn(), "/api/auth/login", %{
+        "username" => "Alice",
+        "password" => "harvest-please"
+      })
+
+    assert %{"user" => %{"balance" => 100}} = json_response(login, 200)
+  end
+
+  test "balance transactions require a session" do
+    conn = json_post(build_conn(), "/api/economy/transaction", %{"delta" => -10})
+    assert %{"ok" => false} = json_response(conn, 401)
+  end
+
+  test "a signed-in account can spend and earn" do
+    conn = register() |> recycle()
+
+    conn = json_post(conn, "/api/economy/transaction", %{"delta" => -25})
+    assert %{"ok" => true, "balance" => 75} = json_response(conn, 200)
+
+    conn = conn |> recycle() |> json_post("/api/economy/transaction", %{"delta" => 5})
+    assert %{"ok" => true, "balance" => 80} = json_response(conn, 200)
+
+    # The change belongs to the account, not the connection.
+    me = conn |> recycle() |> get("/api/auth/me")
+    assert %{"user" => %{"balance" => 80}} = json_response(me, 200)
+  end
+
+  test "balance transactions reject a non-integer delta" do
+    conn = register() |> recycle()
+    conn = json_post(conn, "/api/economy/transaction", %{"delta" => "loot"})
+    assert %{"ok" => false} = json_response(conn, 400)
+  end
+
   test "unmatched /api routes return JSON even when html is requested" do
     conn =
       build_conn()

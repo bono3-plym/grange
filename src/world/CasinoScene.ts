@@ -1,5 +1,10 @@
 import * as ex from "excalibur";
-import { CASINO_EXIT, CASINO_PLAYER_SPAWN, casinoProps } from "./casinoData";
+import {
+	CASINO_BLACKJACK_TABLE,
+	CASINO_EXIT,
+	CASINO_PLAYER_SPAWN,
+	casinoProps,
+} from "./casinoData";
 import { casinoImages } from "./casinoResources";
 import { MAP_COLUMNS, MAP_ROWS, TILE_SIZE } from "./mapData";
 import { MARKETPLACE_CASINO_ENTRANCE } from "./marketplaceData";
@@ -10,6 +15,7 @@ export class CasinoScene extends WalkingScene {
 	constructor(
 		onPromptChange: (prompt: string | null) => void,
 		onAreaChange: (area: WorldArea) => void,
+		onBlackjack: () => void,
 	) {
 		super({
 			area: "Casino",
@@ -24,6 +30,12 @@ export class CasinoScene extends WalkingScene {
 					},
 					prompt: "Press E or Enter to leave the casino",
 					radius: 85,
+				},
+				{
+					position: ex.vec(CASINO_BLACKJACK_TABLE.x, CASINO_BLACKJACK_TABLE.y),
+					prompt: "Press E or Enter to play blackjack",
+					radius: 115,
+					action: onBlackjack,
 				},
 			],
 			onAreaChange,

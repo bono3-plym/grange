@@ -1,4 +1,5 @@
 import type { AuthUser } from "../shared/auth";
+import { economy } from "./world/EconomyManager";
 import { rebindAuth, setAuthToken } from "./socket";
 import { useGameStore } from "./store";
 
@@ -25,10 +26,31 @@ async function post(
 function accept(data: AuthResponse): AuthResponse {
 	if (data.ok && data.user) {
 		useGameStore.getState().setUser(data.user);
+		// The account owns the balance; adopt it so a fresh account starts at
+		// the opening amount instead of inheriting the previous session's total.
+		economy.setBalance(data.user.balance);
 		setAuthToken(data.token ?? null);
 		rebindAuth();
 	}
 	return data;
+}
+
+/**
+ * Mirrors a balance change to the signed-in account. Best-effort: local play
+ * continues even if the request fails, and it is re-synced on next auth.
+ */
+export async function saveBalanceDelta(delta: number): Promise<void> {
+	if (!Number.isFinite(delta) || delta === 0) return;
+	try {
+		await fetch("/api/economy/transaction", {
+			method: "POST",
+			credentials: "same-origin",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ delta }),
+		});
+	} catch {
+		// Ignore: a dropped sync must not break local gameplay.
+	}
 }
 
 export async function register(input: {
@@ -66,6 +88,7 @@ export async function fetchMe(): Promise<AuthUser | null> {
 		token: string;
 	};
 	useGameStore.getState().setUser(user);
+	economy.setBalance(user.balance);
 	setAuthToken(token);
 	rebindAuth();
 	return user;

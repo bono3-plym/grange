@@ -7,6 +7,7 @@ export interface TransactionResult {
 export class EconomyManager {
   private balance: number;
   private listeners: Set<(balance: number) => void> = new Set();
+  private onChange: ((delta: number) => void) | null = null;
 
   constructor(initialBalance: number = 100) {
     this.balance = initialBalance;
@@ -14,6 +15,25 @@ export class EconomyManager {
 
   getBalance(): number {
     return this.balance;
+  }
+
+  /**
+   * Registers a callback fired with the signed delta after every successful
+   * buy/sell, so the balance can be mirrored to the account on the server.
+   * `setBalance` never fires it, so loading the authoritative value from the
+   * server cannot echo back.
+   */
+  setOnChange(callback: ((delta: number) => void) | null): void {
+    this.onChange = callback;
+  }
+
+  /**
+   * Overwrites the balance (e.g. with the server's value) and notifies
+   * listeners. Unlike `buy`/`sell`, this does not report a delta.
+   */
+  setBalance(balance: number): void {
+    this.balance = balance;
+    this.notify();
   }
 
   /**
@@ -59,6 +79,7 @@ export class EconomyManager {
 
     this.balance -= cost;
     this.notify();
+    this.onChange?.(-cost);
     return { success: true, balance: this.balance };
   }
 
@@ -73,6 +94,7 @@ export class EconomyManager {
 
     this.balance += earnings;
     this.notify();
+    this.onChange?.(earnings);
     return { success: true, balance: this.balance };
   }
 }

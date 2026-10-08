@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { register, resetServer, uniqueName } from "./helpers";
+import { BASE, register, resetServer, uniqueName } from "./helpers";
 
 test("farm world loads without asset or page errors", async ({ page }) => {
 	const pageErrors: string[] = [];
@@ -260,4 +260,80 @@ test("selling a chosen number of tomatoes uses the quantity stepper", async ({
 	await expect(page.getByTestId("market-owned-tomato")).toContainText("0");
 	await expect(page.getByTestId("farm-balance")).toContainText("103");
 	await expect(page.getByTestId("market-action-tomato")).toBeDisabled();
+});
+
+test("balance belongs to the account and starts fresh for a new one", async ({
+	page,
+}) => {
+	await resetServer();
+	await register(page, uniqueName("Saver"));
+	await expect(page.getByTestId("farm-balance")).toContainText("100");
+
+	// Spend through the server, the same call the client makes on a purchase.
+	const spent = await page.request.post(`${BASE}/api/economy/transaction`, {
+		data: { delta: -40 },
+	});
+	expect(spent.ok()).toBeTruthy();
+
+	// A reload re-reads the stored balance from the account.
+	await page.reload();
+	await expect(page.getByTestId("farm-balance")).toContainText("60");
+
+	// A different account must not inherit the first one's balance.
+	await page.getByTestId("logout").click();
+	await page.waitForURL(`${BASE}/`);
+	await register(page, uniqueName("Fresh"));
+	await expect(page.getByTestId("farm-balance")).toContainText("100");
+});
+
+test("the blackjack table opens a playable sub-screen", async ({ page }) => {
+	await resetServer();
+	await register(page, uniqueName("Cardcounter"));
+
+	const canvas = page.locator("canvas");
+	const prompt = page.getByTestId("travel-prompt");
+	await page.waitForLoadState("networkidle");
+
+	// Farm -> marketplace.
+	await page.keyboard.down("d");
+	await page.waitForTimeout(1_000);
+	await page.keyboard.up("d");
+	await expect(prompt).toContainText("travel to the marketplace");
+	await page.keyboard.press("e");
+	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
+
+	// Marketplace -> casino.
+	await page.keyboard.down("w");
+	await page.keyboard.down("d");
+	await page.waitForTimeout(2_900);
+	await page.keyboard.up("w");
+	await page.keyboard.up("d");
+	await page.keyboard.down("d");
+	await page.waitForTimeout(1_200);
+	await page.keyboard.up("d");
+	await expect(prompt).toContainText("enter the casino");
+	await page.keyboard.press("e");
+	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
+
+	// Walk down to the blackjack table and open the sub-screen.
+	await page.keyboard.down("s");
+	await page.waitForTimeout(800);
+	await page.keyboard.up("s");
+	await expect(prompt).toContainText("play blackjack");
+	await page.keyboard.press("e");
+
+	const overlay = page.getByTestId("blackjack-overlay");
+	await expect(overlay).toBeVisible();
+	await expect(page.getByTestId("blackjack-balance")).toContainText("100");
+	await expect(page.getByTestId("blackjack-deal")).toBeVisible();
+
+	// Bet, deal, and confirm the player is dealt a hand.
+	await page.getByTestId("blackjack-chip-25").click();
+	await page.getByTestId("blackjack-deal").click();
+	await expect(page.getByTestId("blackjack-player-hand")).toBeVisible();
+
+	// Closing the overlay hands control back to the paused world.
+	await page.getByTestId("blackjack-close").click();
+	await expect(overlay).toHaveCount(0);
+	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
 });

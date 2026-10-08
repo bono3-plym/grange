@@ -79,4 +79,31 @@ defmodule Grange.AccountsTest do
     assert :ok = Accounts.reset()
     assert Accounts.list_users() == []
   end
+
+  test "new users start at the opening balance, included in JSON" do
+    assert {:ok, user} = register()
+    assert user.balance == 100
+
+    decoded = user |> Jason.encode!() |> Jason.decode!()
+    assert decoded["balance"] == 100
+  end
+
+  test "apply_balance_delta spends, earns, and clamps at zero" do
+    {:ok, user} = register()
+
+    assert {:ok, 70} = Accounts.apply_balance_delta(user.id, -30)
+    assert {:ok, 75} = Accounts.apply_balance_delta(user.id, 5)
+    assert {:ok, 0} = Accounts.apply_balance_delta(user.id, -1_000)
+
+    stored = Enum.find(Accounts.list_users(), &(&1.id == user.id))
+    assert stored.balance == 0
+  end
+
+  test "apply_balance_delta rejects bad deltas and unknown users" do
+    {:ok, user} = register()
+
+    assert {:error, _} = Accounts.apply_balance_delta(user.id, "loot")
+    assert {:error, _} = Accounts.apply_balance_delta(user.id, 1.5)
+    assert {:error, _} = Accounts.apply_balance_delta("missing", 10)
+  end
 end

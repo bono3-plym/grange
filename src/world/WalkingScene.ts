@@ -18,8 +18,8 @@ export interface SceneInteraction {
 	/** Travel to another scene when pressed. Omit for an in-place action. */
 	destination?: WorldSceneName;
 	destinationSpawn?: SceneSpawn;
-	/** Run an in-place action (e.g. open a shop window) instead of travelling. */
-	onInteract?: () => void;
+	/** Runs instead of scene travel when the interaction is triggered. */
+	action?: () => void;
 }
 
 interface SceneActivationData {
@@ -73,20 +73,22 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		this.setPrompt(null);
 	}
 
-	/** Freeze or resume the player, e.g. while a shop window is open. */
+	/** Freezes movement and input while a DOM overlay owns the screen. */
 	setPaused(paused: boolean): void {
+		if (this.paused === paused) return;
 		this.paused = paused;
-		this.player.vel = ex.Vector.Zero;
-		this.inputManager?.clear();
+		if (paused) {
+			this.inputManager?.destroy();
+			this.inputManager = undefined;
+			this.player.vel = ex.Vector.Zero;
+			this.setPrompt(null);
+		} else {
+			this.inputManager = new InputManager();
+		}
 	}
 
 	override onPreUpdate(engine: ex.Engine): void {
-		if (!this.inputManager) return;
-		if (this.paused) {
-			this.player.vel = ex.Vector.Zero;
-			this.inputManager.clear();
-			return;
-		}
+		if (!this.inputManager || this.paused) return;
 		const direction = this.inputManager.getMovementVector();
 		updateWalkingPlayer(this.player, direction, this.playerSpeed);
 
@@ -101,18 +103,16 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			!this.traveling &&
 			this.inputManager.consumePress("KeyE", "Enter")
 		) {
-			if (interaction.onInteract) {
-				this.paused = true;
-				this.player.vel = ex.Vector.Zero;
-				this.setPrompt(null);
-				interaction.onInteract();
-			} else if (interaction.destination) {
-				this.traveling = true;
-				this.setPrompt(null);
-				void engine.goToScene(interaction.destination, {
-					sceneActivationData: { spawn: interaction.destinationSpawn },
-				});
+			this.setPrompt(null);
+			if (interaction.action) {
+				interaction.action();
+				return;
 			}
+			if (!interaction.destination) return;
+			this.traveling = true;
+			void engine.goToScene(interaction.destination, {
+				sceneActivationData: { spawn: interaction.destinationSpawn },
+			});
 		}
 	}
 

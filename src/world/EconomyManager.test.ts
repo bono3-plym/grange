@@ -11,6 +11,44 @@ describe("EconomyManager", () => {
     expect(economy.getBalance()).toBe(100);
   });
 
+  it("setBalance overwrites and notifies without reporting a delta", () => {
+    const manager = new EconomyManager(100);
+    const onChange = vi.fn();
+    const seen: number[] = [];
+    manager.setOnChange(onChange);
+    const unsubscribe = manager.subscribe((balance) => seen.push(balance));
+
+    manager.setBalance(250);
+
+    expect(manager.getBalance()).toBe(250);
+    expect(seen).toEqual([100, 250]);
+    expect(onChange).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it("reports the signed delta after a successful buy and sell", () => {
+    const manager = new EconomyManager(100);
+    const deltas: number[] = [];
+    manager.setOnChange((delta) => deltas.push(delta));
+
+    manager.buy(30);
+    manager.sell(5);
+
+    expect(deltas).toEqual([-30, 5]);
+    expect(manager.getBalance()).toBe(75);
+  });
+
+  it("does not report a delta for a rejected transaction", () => {
+    const manager = new EconomyManager(100);
+    const onChange = vi.fn();
+    manager.setOnChange(onChange);
+
+    manager.buy(101);
+    manager.sell(Number.NaN);
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("notifies subscribers immediately with the current balance", () => {
     const manager = new EconomyManager(100);
     const seen: number[] = [];
