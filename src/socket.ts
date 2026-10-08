@@ -148,6 +148,27 @@ export function emitFarmAction(
 		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }
 
+/** Sells tomatoes from the visited farm's barn back to the market. */
+export function emitSellTomatoes(
+	owner: string,
+	count: number,
+	cb?: (res: Ack) => void,
+): void {
+	const channel = farmChannel;
+	if (!channel || farmOwner !== owner) {
+		cb?.({ ok: false, error: "not visiting farm" });
+		return;
+	}
+
+	channel
+		.push("sellTomatoes", { count })
+		.receive("ok", () => cb?.({ ok: true }))
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not sell" }),
+		)
+		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
+}
+
 /** Registers global handlers and opens the lobby channel. */
 export function initSocket(): void {
 	socket.connect();

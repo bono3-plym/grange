@@ -60,11 +60,16 @@ export class InputManager {
 		return pressed;
 	}
 
+	/** Forget every held and pending key, e.g. while a modal has focus. */
+	clear(): void {
+		this.activeKeys.clear();
+		this.pressedKeys.clear();
+	}
+
 	destroy(): void {
 		window.removeEventListener("keydown", this.boundKeyDown);
 		window.removeEventListener("keyup", this.boundKeyUp);
 		window.removeEventListener("blur", this.boundBlur);
-		this.activeKeys.clear();
-		this.pressedKeys.clear();
+		this.clear();
 	}
 }

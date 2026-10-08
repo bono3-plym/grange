@@ -3,18 +3,27 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { FarmToolId } from "../../shared/farm";
 import { logout } from "../auth";
-import { emitLeaveFarm, emitVisitFarm } from "../socket";
+import { emitLeaveFarm, emitSellTomatoes, emitVisitFarm } from "../socket";
 import { useGameStore } from "../store";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
 import { EconomyHUD } from "./EconomyHUD";
+import { economy } from "./EconomyManager";
 import { FarmMapScene } from "./FarmMapScene";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
+import {
+	MARKET_ITEMS,
+	MARKETS,
+	type MarketId,
+	type MarketItemId,
+} from "./marketData";
 import { MarketplaceScene } from "./MarketplaceScene";
 import { marketplaceResources } from "./marketplaceResources";
+import { MarketWindow, type MarketItemControl } from "./MarketWindow";
 import { resources } from "./resources";
+import { useEconomyBalance } from "./useEconomy";
 import type { WorldArea } from "./WalkingScene";
 
 const worldResources = [
@@ -42,10 +51,14 @@ const TOOL_BY_KEY: Record<string, FarmToolId> = {
 export default function FarmMap() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const sceneRef = useRef<FarmMapScene | null>(null);
+	const marketSceneRef = useRef<MarketplaceScene | null>(null);
 	const username = useGameStore((s) => s.username);
 	const farm = useGameStore((s) => s.activeFarm);
 	const tool = useGameStore((s) => s.tool);
 	const setTool = useGameStore((s) => s.setTool);
+	const tomatoSeeds = useGameStore((s) => s.tomatoSeeds);
+	const addTomatoSeeds = useGameStore((s) => s.addTomatoSeeds);
+	const balance = useEconomyBalance();
 	const { owner } = useParams<{ owner?: string }>();
 	const navigate = useNavigate();
 	const [hud, setHud] = useState<FarmHudSnapshot>({
@@ -53,6 +66,8 @@ export default function FarmMap() {
 		message: "Hoe: click or drag on grass to till.",
 		hovered: null,
 	});
+	const [market, setMarket] = useState<MarketId | null>(null);
+	const [marketMessage, setMarketMessage] = useState<string | null>(null);
 
 	const target = owner ?? username;
 	const isOwner = target === username;
@@ -88,10 +103,16 @@ export default function FarmMap() {
 		scene.onFarmUpdate = (snapshot) => setHud(snapshot);
 		sceneRef.current = scene;
 		engine.addScene("farm-map", scene);
-		engine.addScene(
-			"marketplace",
-			new MarketplaceScene(setTravelPrompt, setArea),
+		const marketplace = new MarketplaceScene(
+			setTravelPrompt,
+			setArea,
+			(id) => {
+				setMarketMessage(null);
+				setMarket(id);
+			},
 		);
+		marketSceneRef.current = marketplace;
+		engine.addScene("marketplace", marketplace);
 		engine.addScene("casino", new CasinoScene(setTravelPrompt, setArea));
 		void Promise.all(worldResources.map((resource) => resource.load())).then(
 			async () => {
@@ -104,6 +125,7 @@ export default function FarmMap() {
 		return () => {
 			cancelled = true;
 			sceneRef.current = null;
+			marketSceneRef.current = null;
 			engine.stop();
 			engine.dispose();
 		};
@@ -122,6 +144,57 @@ export default function FarmMap() {
 		sceneRef.current?.setTool(tool);
 	}, [tool]);
 
+	function closeMarket() {
+		setMarket(null);
+		setMarketMessage(null);
+		marketSceneRef.current?.setPaused(false);
+	}
+
+	function buyTomatoSeeds() {
+		const item = MARKET_ITEMS["tomato-seed"];
+		const result = economy.buy(item.price);
+		if (!result.success) {
+			setMarketMessage(result.error ?? "Purchase failed.");
+			return;
+		}
+		addTomatoSeeds(item.quantity);
+		setMarketMessage(
+			`Bought ${item.quantity} tomato seeds for $${item.price}.`,
+		);
+	}
+
+	function sellTomato(quantity: number) {
+		if (!target || quantity < 1) return;
+		const item = MARKET_ITEMS.tomato;
+		emitSellTomatoes(target, quantity, (res) => {
+			if (!res.ok) {
+				setMarketMessage(res.error ?? "Sale failed.");
+				return;
+			}
+			economy.sell(item.price * quantity);
+			const noun = quantity === 1 ? "tomato" : "tomatoes";
+			setMarketMessage(
+				`Sold ${quantity} ${noun} for $${item.price * quantity}.`,
+			);
+		});
+	}
+
+	const itemControls: Record<MarketItemId, MarketItemControl> = {
+		"tomato-seed": {
+			owned: tomatoSeeds,
+			disabled: balance < MARKET_ITEMS["tomato-seed"].price,
+			actionLabel: "Buy",
+			onAction: buyTomatoSeeds,
+		},
+		tomato: {
+			owned: farm?.tomatoes ?? 0,
+			disabled: !isOwner || (farm?.tomatoes ?? 0) < 1,
+			actionLabel: "Sell",
+			maxQuantity: farm?.tomatoes ?? 0,
+			onAction: sellTomato,
+		},
+	};
+
 	async function onSignOut() {
 		await logout();
 		navigate("/", { replace: true });
@@ -134,6 +207,14 @@ export default function FarmMap() {
 				className="farm-map-canvas"
 				aria-label={`${area} map. Use WASD or arrow keys to walk.`}
 			/>
+			{market && (
+				<MarketWindow
+					market={MARKETS[market]}
+					controls={itemControls}
+					message={marketMessage}
+					onClose={closeMarket}
+				/>
+			)}
 			{travelPrompt && (
 				<div className="farm-map-travel-prompt" data-testid="travel-prompt">
 					{travelPrompt}

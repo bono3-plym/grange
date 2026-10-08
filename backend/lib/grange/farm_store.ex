@@ -30,6 +30,9 @@ defmodule Grange.FarmStore do
   @spec action(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
   def action(owner, action), do: GenServer.call(__MODULE__, {:action, owner, action})
 
+  @spec sell_tomatoes(String.t(), integer()) :: {:ok, map()} | {:error, String.t()}
+  def sell_tomatoes(owner, count), do: GenServer.call(__MODULE__, {:sell_tomatoes, owner, count})
+
   @spec tick(integer()) :: [String.t()]
   def tick(now \\ System.monotonic_time(:millisecond)),
     do: GenServer.call(__MODULE__, {:tick, now})
@@ -68,6 +71,15 @@ defmodule Grange.FarmStore do
       {:ok, kind, x, y} -> run(state, owner, kind, x, y)
       :error -> {:reply, {:error, "invalid action"}, state}
     end
+  end
+
+  def handle_call({:sell_tomatoes, owner, count}, _from, state)
+      when is_integer(count) and count > 0 do
+    do_sell_tomatoes(state, owner, count)
+  end
+
+  def handle_call({:sell_tomatoes, _owner, _count}, _from, state) do
+    {:reply, {:error, "invalid count"}, state}
   end
 
   def handle_call({:tick, now}, _from, state) do
@@ -208,6 +220,21 @@ defmodule Grange.FarmStore do
   defp add_tomatoes(state, owner, count) do
     farm = Map.get(state.farms, owner)
     put_farm(state, owner, %{farm | tomatoes: farm.tomatoes + count})
+  end
+
+  defp do_sell_tomatoes(state, owner, count) do
+    case Map.get(state.farms, owner) do
+      %{tomatoes: tomatoes} = farm when tomatoes >= count ->
+        state = put_farm(state, owner, %{farm | tomatoes: tomatoes - count})
+        broadcast_change(owner, state)
+        {:reply, {:ok, view_of(state, owner)}, state}
+
+      %{} ->
+        {:reply, {:error, "not enough tomatoes"}, state}
+
+      nil ->
+        {:reply, {:error, "farm not found"}, state}
+    end
   end
 
   defp put_farm(state, owner, farm), do: %{state | farms: Map.put(state.farms, owner, farm)}

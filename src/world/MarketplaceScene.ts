@@ -1,7 +1,10 @@
 import * as ex from "excalibur";
+import type { MarketId } from "./marketData";
 import {
 	MARKETPLACE_CASINO_ENTRANCE,
 	MARKETPLACE_PLAYER_SPAWN,
+	MARKETPLACE_PRODUCE_MARKET_ENTRANCE,
+	MARKETPLACE_SEED_MARKET_ENTRANCE,
 	MARKETPLACE_TRAIN_STOP,
 	marketplaceProps,
 	marketplaceTerrainAt,
@@ -14,6 +17,7 @@ export class MarketplaceScene extends WalkingScene {
 	constructor(
 		onPromptChange: (prompt: string | null) => void,
 		onAreaChange: (area: WorldArea) => void,
+		onOpenMarket: (market: MarketId) => void,
 	) {
 		super({
 			area: "Marketplace",
@@ -32,6 +36,24 @@ export class MarketplaceScene extends WalkingScene {
 					destination: "casino",
 					prompt: "Press E or Enter to enter the casino",
 					radius: 90,
+				},
+				{
+					position: ex.vec(
+						MARKETPLACE_SEED_MARKET_ENTRANCE.x,
+						MARKETPLACE_SEED_MARKET_ENTRANCE.y,
+					),
+					prompt: "Press E or Enter to enter the seed market",
+					radius: 95,
+					onInteract: () => onOpenMarket("seed"),
+				},
+				{
+					position: ex.vec(
+						MARKETPLACE_PRODUCE_MARKET_ENTRANCE.x,
+						MARKETPLACE_PRODUCE_MARKET_ENTRANCE.y,
+					),
+					prompt: "Press E or Enter to enter the produce market",
+					radius: 95,
+					onInteract: () => onOpenMarket("produce"),
 				},
 			],
 			onAreaChange,

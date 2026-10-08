@@ -1,21 +1,13 @@
 import type React from "react";
-import { useEffect, useState } from "react";
-import { economy } from "./EconomyManager";
+import { useEconomyBalance } from "./useEconomy";
 
 export const EconomyHUD: React.FC = () => {
-  const [balance, setBalance] = useState<number>(economy.getBalance());
+	const balance = useEconomyBalance();
 
-  useEffect(() => {
-    const unsubscribe = economy.subscribe((newBalance) => {
-      setBalance(newBalance);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  return (
-    <span className="farm-map-balance" data-testid="farm-balance">
-      <span className="farm-map-balance-symbol">$</span>
-      {balance.toLocaleString()}
-    </span>
-  );
+	return (
+		<span className="farm-map-balance" data-testid="farm-balance">
+			<span className="farm-map-balance-symbol">$</span>
+			{balance.toLocaleString()}
+		</span>
+	);
 };

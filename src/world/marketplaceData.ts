@@ -20,6 +20,8 @@ export type MarketplacePropKey =
 export const MARKETPLACE_PLAYER_SPAWN = { x: 455, y: 665 } as const;
 export const MARKETPLACE_TRAIN_STOP = { x: 430, y: 665 } as const;
 export const MARKETPLACE_CASINO_ENTRANCE = { x: 960, y: 340 } as const;
+export const MARKETPLACE_SEED_MARKET_ENTRANCE = { x: 190, y: 350 } as const;
+export const MARKETPLACE_PRODUCE_MARKET_ENTRANCE = { x: 575, y: 350 } as const;
 
 export function marketplaceTerrainAt(column: number, row: number): TerrainKey {
 	if (

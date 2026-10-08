@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import {
+	MARKETPLACE_PRODUCE_MARKET_ENTRANCE,
+	MARKETPLACE_SEED_MARKET_ENTRANCE,
 	MARKETPLACE_TRAIN_STOP,
 	marketplaceProps,
 	marketplaceTerrainAt,
@@ -38,5 +40,17 @@ describe("marketplace map data", () => {
 		expect(MARKETPLACE_TRAIN_STOP.x).toBeLessThanOrEqual(MAP_WIDTH);
 		expect(MARKETPLACE_TRAIN_STOP.y).toBeGreaterThanOrEqual(0);
 		expect(MARKETPLACE_TRAIN_STOP.y).toBeLessThanOrEqual(MAP_HEIGHT);
+	});
+
+	it("places both market entrances within the map", () => {
+		for (const entrance of [
+			MARKETPLACE_SEED_MARKET_ENTRANCE,
+			MARKETPLACE_PRODUCE_MARKET_ENTRANCE,
+		]) {
+			expect(entrance.x).toBeGreaterThanOrEqual(0);
+			expect(entrance.x).toBeLessThanOrEqual(MAP_WIDTH);
+			expect(entrance.y).toBeGreaterThanOrEqual(0);
+			expect(entrance.y).toBeLessThanOrEqual(MAP_HEIGHT);
+		}
 	});
 });

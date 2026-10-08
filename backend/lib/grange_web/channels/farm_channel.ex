@@ -31,14 +31,12 @@ defmodule GrangeWeb.FarmChannel do
 
   @impl true
   def handle_in("farmAction", %{"action" => action}, socket) do
-    owner = socket.assigns[:owner]
-    user = socket.assigns[:user]
+    authorize(socket, fn owner -> act(socket, owner, action) end)
+  end
 
-    cond do
-      is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
-      user.username != owner -> {:reply, {:error, %{error: "not your farm"}}, socket}
-      true -> act(socket, owner, action)
-    end
+  @impl true
+  def handle_in("sellTomatoes", %{"count" => count}, socket) do
+    authorize(socket, fn owner -> sell(socket, owner, count) end)
   end
 
   @impl true
@@ -47,8 +45,26 @@ defmodule GrangeWeb.FarmChannel do
     {:noreply, socket}
   end
 
+  defp authorize(socket, handler) do
+    owner = socket.assigns[:owner]
+    user = socket.assigns[:user]
+
+    cond do
+      is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
+      user.username != owner -> {:reply, {:error, %{error: "not your farm"}}, socket}
+      true -> handler.(owner)
+    end
+  end
+
   defp act(socket, owner, action) do
     case FarmStore.action(owner, action) do
+      {:ok, _farm} -> {:reply, :ok, socket}
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
+
+  defp sell(socket, owner, count) do
+    case FarmStore.sell_tomatoes(owner, count) do
       {:ok, _farm} -> {:reply, :ok, socket}
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
     end

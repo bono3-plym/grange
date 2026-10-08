@@ -10,12 +10,14 @@ interface GameStore {
 	farms: FarmSummary[];
 	activeFarm: ActiveFarm | null;
 	tool: FarmToolId;
+	tomatoSeeds: number;
 	setUser: (user: AuthUser) => void;
 	clearUser: () => void;
 	setPlayers: (players: Player[]) => void;
 	setFarms: (farms: FarmSummary[]) => void;
 	setActiveFarm: (farm: ActiveFarm | null) => void;
 	setTool: (tool: FarmToolId) => void;
+	addTomatoSeeds: (count: number) => void;
 }
 
 export const useGameStore = create<GameStore>((set) => ({
@@ -26,10 +28,13 @@ export const useGameStore = create<GameStore>((set) => ({
 	farms: [],
 	activeFarm: null,
 	tool: "hoe",
+	tomatoSeeds: 0,
 	setUser: (user) => set({ user, username: user.username }),
-	clearUser: () => set({ user: null, username: "", activeFarm: null }),
+	clearUser: () => set({ user: null, username: "", activeFarm: null, tomatoSeeds: 0 }),
 	setPlayers: (players) => set({ players }),
 	setFarms: (farms) => set({ farms }),
 	setActiveFarm: (activeFarm) => set({ activeFarm }),
 	setTool: (tool) => set({ tool }),
+	addTomatoSeeds: (count) =>
+		set((state) => ({ tomatoSeeds: state.tomatoSeeds + count })),
 }));

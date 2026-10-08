@@ -2,7 +2,7 @@ defmodule GrangeWeb.FarmChannelTest do
   @moduledoc false
   use GrangeWeb.ChannelCase
 
-  alias Grange.{Accounts, FarmStore}
+  alias Grange.{Accounts, Farm, FarmStore}
   alias GrangeWeb.ChannelCase, as: Helper
 
   setup do
@@ -56,6 +56,36 @@ defmodule GrangeWeb.FarmChannelTest do
       signed_socket("Bob") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
 
     ref = push(socket, "farmAction", %{"action" => %{"kind" => "till", "x" => 0, "y" => 0}})
+    assert_reply(ref, :error, reply)
+    assert reply.error == "not your farm"
+  end
+
+  test "the owner can sell tomatoes and the change is broadcast" do
+    FarmStore.ensure("Alice")
+    FarmStore.action("Alice", %{"kind" => "till", "x" => 1, "y" => 1})
+    FarmStore.action("Alice", %{"kind" => "plant", "x" => 1, "y" => 1})
+    FarmStore.action("Alice", %{"kind" => "water", "x" => 1, "y" => 1})
+
+    future = System.monotonic_time(:millisecond) + Farm.grow_ms() + 60_000
+    FarmStore.tick(future)
+    FarmStore.action("Alice", %{"kind" => "harvest", "x" => 1, "y" => 1})
+
+    {:ok, _reply, socket} =
+      signed_socket("Alice") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref = push(socket, "sellTomatoes", %{"count" => 1})
+    assert_reply(ref, :ok)
+    remaining = Farm.harvest_yield() - 1
+    assert_broadcast("farmUpdate", %{farm: %{tomatoes: ^remaining}})
+  end
+
+  test "a visitor cannot sell tomatoes" do
+    FarmStore.ensure("Alice")
+
+    {:ok, _reply, socket} =
+      signed_socket("Bob") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref = push(socket, "sellTomatoes", %{"count" => 1})
     assert_reply(ref, :error, reply)
     assert reply.error == "not your farm"
   end
