@@ -280,6 +280,7 @@ test("balance belongs to the account and starts fresh for a new one", async ({
 	await expect(page.getByTestId("farm-balance")).toContainText("60");
 
 	// A different account must not inherit the first one's balance.
+	await page.getByTestId("open-pause").click();
 	await page.getByTestId("logout").click();
 	await page.waitForURL(`${BASE}/`);
 	await register(page, uniqueName("Fresh"));

@@ -3,6 +3,7 @@ import type { FarmTileState, FarmToolId } from "../../shared/farm";
 import { isFarmInBounds } from "../../shared/farm";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
+import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import {
 	BlockRegistry,
 	decorByTile,
@@ -27,7 +28,7 @@ import {
 import { propImages, terrainFrames, terrainImage } from "./resources";
 import { updateWalkingPlayer } from "./playerMovement";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
-import { TOOL_HINTS, TOOL_KEYS, TOOL_KIND } from "./farmTools";
+import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
 import { clearDecorAt, refreshTile } from "./tileSync";
 import type { WorldArea } from "./WalkingScene";
 
@@ -183,6 +184,12 @@ export class FarmMapScene extends ex.Scene {
 	}
 
 	override onPreUpdate(engine: ex.Engine, _delta: number): void {
+		// Freeze movement while the inventory modal captures input.
+		if (isInventoryBlockingInput()) {
+			this.player.vel = ex.vec(0, 0);
+			return;
+		}
+
 		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
 
@@ -203,14 +210,8 @@ export class FarmMapScene extends ex.Scene {
 	}
 
 	private handleToolKeys(): void {
-		for (const [key, tool] of Object.entries(TOOL_KEYS)) {
-			if (this.inputManager.consumePressed(key)) {
-				useGameStore.getState().setTool(tool);
-				this.message = TOOL_HINTS[tool];
-				this.emitHud();
-			}
-		}
-
+		// Tool selection lives on the hotbar; this only handles the contextual
+		// action key that acts on the tile the player is standing on.
 		if (this.isOwner && this.inputManager.consumePressed("Space")) {
 			this.actOnPlayerTile();
 		}

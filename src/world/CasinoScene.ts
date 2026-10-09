@@ -4,6 +4,7 @@ import {
 	CASINO_EXIT,
 	CASINO_PLAYER_SPAWN,
 	CASINO_POKER_TABLE,
+	CASINO_ROULETTE_TABLE,
 	casinoProps,
 } from "./casinoData";
 import { casinoImages } from "./casinoResources";
@@ -18,6 +19,7 @@ export class CasinoScene extends WalkingScene {
 		onAreaChange: (area: WorldArea) => void,
 		onBlackjack: () => void,
 		onPoker: () => void,
+		onRoulette: () => void,
 	) {
 		super({
 			area: "Casino",
@@ -44,6 +46,12 @@ export class CasinoScene extends WalkingScene {
 					prompt: "Press E or Enter to play poker",
 					radius: 115,
 					action: onPoker,
+				},
+				{
+					position: ex.vec(CASINO_ROULETTE_TABLE.x, CASINO_ROULETTE_TABLE.y),
+					prompt: "Press E or Enter to play roulette",
+					radius: 115,
+					action: onRoulette,
 				},
 			],
 			onAreaChange,

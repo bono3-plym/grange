@@ -26,4 +26,13 @@ export default defineConfig({
       "/api": { target: BACKEND },
     },
   },
+  // `vite preview` doesn't inherit server.proxy, so mirror it so the built SPA
+  // can also be exercised locally against a running backend.
+  preview: {
+    port: 3000,
+    proxy: {
+      "/socket": { target: BACKEND, ws: true },
+      "/api": { target: BACKEND },
+    },
+  },
 })

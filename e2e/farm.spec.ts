@@ -14,16 +14,17 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
-	await expect(page.getByTestId("farm-hud")).toBeVisible();
-	await expect(page.getByTestId("tool-hoe")).toHaveAttribute("aria-pressed", "true");
+	await expect(page.getByTestId("farm-tile")).toBeVisible();
+	// The hotbar starts on the hoe.
+	await expect(page.getByTestId("slot-hotbar-0")).toHaveClass(/inv-slot-selected/);
 
 	// Hoe tile (9, 7)
 	await clickTile(page, 9, 7);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): tilled");
 
-	// Seeds
+	// Seeds (hotbar slot 2 maps to key "2")
 	await page.keyboard.press("2");
-	await expect(page.getByTestId("tool-seed")).toHaveAttribute("aria-pressed", "true");
+	await expect(page.getByTestId("slot-hotbar-1")).toHaveClass(/inv-slot-selected/);
 	await clickTile(page, 9, 7);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): planted");
 
@@ -38,7 +39,12 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	});
 	await page.keyboard.press("4");
 	await clickTile(page, 9, 7);
-	await expect(page.getByTestId("farm-tomatoes")).toContainText("3");
+	// Harvested tomatoes land in the physical inventory: hotbar slot 5 (tomato)
+	// grows from 5 to 8.
+	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute(
+		"data-count",
+		"8",
+	);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): tilled");
 
 	// Drag-paint tills two tiles at once
@@ -58,10 +64,10 @@ test("the hoe refuses fence tiles", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
-	await expect(page.getByTestId("farm-hud")).toBeVisible();
+	await expect(page.getByTestId("notification-feed")).toBeVisible();
 
 	await clickTile(page, 7, 5);
-	await expect(page.getByTestId("farm-hint")).toContainText(
+	await expect(page.getByTestId("notification-feed")).toContainText(
 		"Something is in the way.",
 	);
 	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): grass");
@@ -71,10 +77,9 @@ test("the hoe refuses tiles behind buildings", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
-	await expect(page.getByTestId("farm-hud")).toBeVisible();
 
 	await clickTile(page, 3, 2);
-	await expect(page.getByTestId("farm-hint")).toContainText(
+	await expect(page.getByTestId("notification-feed")).toContainText(
 		"Something is in the way.",
 	);
 	await expect(page.getByTestId("farm-tile")).toContainText("(3, 2): grass");
@@ -84,7 +89,6 @@ test("tilling under flowers clears them", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
-	await expect(page.getByTestId("farm-hud")).toBeVisible();
 
 	await clickTile(page, 11, 3);
 	await expect(page.getByTestId("farm-tile")).toContainText("(11, 3): tilled");
@@ -103,28 +107,31 @@ test("hoeing and planting a tile round-trips through the server", async ({
 	await expect(tiles).toHaveText("0 tiles");
 
 	// The player spawns on a farmable tile, so the selected tool acts immediately.
-	await page.getByTestId("tool-hoe").click();
+	await page.getByTestId("slot-hotbar-0").click();
 	await page.keyboard.press("Space");
 	await expect(tiles).toHaveText("1 tiles");
 
-	await page.getByTestId("tool-seed").click();
+	await page.getByTestId("slot-hotbar-1").click();
 	await page.keyboard.press("Space");
 	await expect(tiles).toHaveText("1 tiles");
 });
 
-test("the tool bar highlights the selected tool", async ({ page }) => {
+test("selecting a hotbar slot highlights it", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Farmer"));
 
-	await page.getByTestId("tool-bucket").click();
-	await expect(page.getByTestId("tool-bucket")).toHaveClass(/farm-tool-active/);
-	await expect(page.getByTestId("tool-hoe")).not.toHaveClass(/farm-tool-active/);
+	await page.getByTestId("slot-hotbar-2").click();
+	await expect(page.getByTestId("slot-hotbar-2")).toHaveClass(/inv-slot-selected/);
+	await expect(page.getByTestId("slot-hotbar-0")).not.toHaveClass(
+		/inv-slot-selected/,
+	);
 });
 
 test("a visitor sees another farm read-only", async ({ page }) => {
 	await resetServer();
 	const owner = uniqueName("Owner");
 	await register(page, owner);
+	await page.keyboard.press("Escape");
 	await page.getByTestId("logout").click();
 	await page.waitForURL("**/");
 
@@ -132,5 +139,5 @@ test("a visitor sees another farm read-only", async ({ page }) => {
 	await page.goto(`/farms/${encodeURIComponent(owner)}`);
 
 	await expect(page.locator("canvas[aria-label^='Farm map']")).toBeVisible();
-	await expect(page.getByTestId("tool-hoe")).toHaveCount(0);
+	await expect(page.getByTestId("notification-feed")).toContainText("Visiting");
 });

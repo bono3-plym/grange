@@ -108,11 +108,12 @@ export function MarketWindow({
 			if (event.repeat) return;
 			if (event.code === "Escape" || event.code === "KeyE") {
 				event.preventDefault();
+				event.stopImmediatePropagation();
 				onClose();
 			}
 		}
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
+		window.addEventListener("keydown", onKeyDown, true);
+		return () => window.removeEventListener("keydown", onKeyDown, true);
 	}, [onClose]);
 
 	function setQuantity(id: MarketItemId, value: number, max: number) {
