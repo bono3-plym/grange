@@ -23,6 +23,7 @@ import {
 import { MarketplaceScene } from "./MarketplaceScene";
 import { marketplaceResources } from "./marketplaceResources";
 import { MarketWindow, type MarketItemControl } from "./MarketWindow";
+import { PokerOverlay } from "./PokerOverlay";
 import { resources } from "./resources";
 import { useEconomyBalance } from "./useEconomy";
 import type { WorldArea } from "./WalkingScene";
@@ -86,6 +87,7 @@ export default function FarmMap() {
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
 	const [blackjackOpen, setBlackjackOpen] = useState(false);
+	const [pokerOpen, setPokerOpen] = useState(false);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -117,10 +119,18 @@ export default function FarmMap() {
 		);
 		marketSceneRef.current = marketplace;
 		engine.addScene("marketplace", marketplace);
-		const casino = new CasinoScene(setTravelPrompt, setArea, () => {
-			casino.setPaused(true);
-			setBlackjackOpen(true);
-		});
+		const casino = new CasinoScene(
+			setTravelPrompt,
+			setArea,
+			() => {
+				casino.setPaused(true);
+				setBlackjackOpen(true);
+			},
+			() => {
+				casino.setPaused(true);
+				setPokerOpen(true);
+			},
+		);
 		casinoRef.current = casino;
 		engine.addScene("casino", casino);
 		void Promise.all(worldResources.map((resource) => resource.load())).then(
@@ -210,9 +220,10 @@ export default function FarmMap() {
 		navigate("/", { replace: true });
 	}
 
-	function closeBlackjack() {
+	function closeGame(game: "blackjack" | "poker") {
 		casinoRef.current?.setPaused(false);
-		setBlackjackOpen(false);
+		if (game === "blackjack") setBlackjackOpen(false);
+		else setPokerOpen(false);
 	}
 
 	return (
@@ -301,7 +312,8 @@ export default function FarmMap() {
 					</p>
 				</div>
 			)}
-			{blackjackOpen && <BlackjackOverlay onClose={closeBlackjack} />}
+			{blackjackOpen && <BlackjackOverlay onClose={() => closeGame("blackjack")} />}
+			{pokerOpen && <PokerOverlay onClose={() => closeGame("poker")} />}
 		</main>
 	);
 }
