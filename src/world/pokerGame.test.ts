@@ -31,6 +31,33 @@ function makeBank(initial = 100): {
 	};
 }
 
+/** Like `makeBank`, but the wallet can be made to reject withdrawals. */
+function makeControllableBank(initial = 100): {
+	bank: Bank;
+	setWithdraw: (ok: boolean) => void;
+	balance: () => number;
+} {
+	let balance = initial;
+	let canWithdraw = true;
+	return {
+		bank: {
+			getBalance: () => balance,
+			withdraw: (amount) => {
+				if (!canWithdraw || balance < amount) return false;
+				balance -= amount;
+				return true;
+			},
+			deposit: (amount) => {
+				balance += amount;
+			},
+		},
+		setWithdraw: (ok) => {
+			canWithdraw = ok;
+		},
+		balance: () => balance,
+	};
+}
+
 function setup(deck: readonly Card[], strategy: DealerStrategy = alwaysCheck) {
 	const { bank, balance } = makeBank(100);
 	const table = new PokerTable(bank, { deck, strategy, rng: () => 0.99 });
@@ -72,6 +99,18 @@ describe("PokerTable blinds and dealing", () => {
 		expect(table.startHand()).toBe(false);
 		expect(table.snapshot().message).toMatch(/big blind/);
 	});
+
+	it("will not start when the dealer can't cover the big blind", () => {
+		const { bank } = makeBank(100);
+		const table = new PokerTable(bank, {
+			deck: runoutDeck,
+			strategy: alwaysCheck,
+			dealerStack: 5,
+		});
+		expect(table.startHand()).toBe(false);
+		expect(table.snapshot().message).toMatch(/big blind/);
+		expect(table.snapshot().dealerStack).toBe(5);
+	});
 });
 
 describe("PokerTable betting", () => {
@@ -107,6 +146,22 @@ describe("PokerTable betting", () => {
 		expect(snap.currentBet).toBe(20);
 		expect(snap.winner).toBe("player");
 		expect(balance()).toBe(110);
+	});
+
+	it("aborts the action when the withdrawal fails", () => {
+		const { bank, setWithdraw } = makeControllableBank(100);
+		const table = new PokerTable(bank, {
+			deck: runoutDeck,
+			strategy: alwaysCheck,
+		});
+		expect(table.startHand()).toBe(true);
+		// The wallet stops honouring withdrawals after the blind is posted.
+		setWithdraw(false);
+		expect(table.call()).toBe(false);
+		const snap = table.snapshot();
+		expect(snap.playerCommitted).toBe(5);
+		expect(snap.pot).toBe(15);
+		expect(snap.phase).toBe("playerTurn");
 	});
 
 	it("never bets more than the opponent can cover", () => {
@@ -173,6 +228,17 @@ describe("PokerTable showdown", () => {
 		expect(snap.community).toHaveLength(5);
 		expect(snap.winner).toBe("player");
 		expect(balance()).toBe(200);
+	});
+
+	it("settles as a fold when the player leaves mid-hand", () => {
+		const { table, balance } = setup(runoutDeck);
+		table.startHand();
+		expect(table.forfeit()).toBe(true);
+		const snap = table.snapshot();
+		expect(snap.phase).toBe("settled");
+		expect(snap.winner).toBe("dealer");
+		expect(snap.net).toBe(-5);
+		expect(balance()).toBe(95);
 	});
 
 	it("lets the player take the pot when the dealer folds", () => {

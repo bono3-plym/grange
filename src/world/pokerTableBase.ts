@@ -99,6 +99,20 @@ export abstract class PokerTableBase {
 		return true;
 	}
 
+	/**
+	 * The player walks away mid-hand. Settle it as if they folded so the pot and
+	 * committed chips don't linger half-played; unlike `fold`, this always
+	 * forfeits the player's hand even when it is the dealer's turn.
+	 */
+	forfeit(): boolean {
+		if (!this.canAct()) return false;
+		this.winner = "dealer";
+		this.net = -this.playerTotal;
+		this.message = `You left the table. The dealer takes $${this.pot}.`;
+		this.phase = "settled";
+		return true;
+	}
+
 	check(): boolean {
 		if (!this.canAct()) return false;
 		const actor = this.actor();
@@ -114,7 +128,7 @@ export abstract class PokerTableBase {
 		const actor = this.actor();
 		const need = this.currentBet - this.streetOf(actor);
 		if (need <= 0) return false;
-		this.commit(actor, need);
+		if (!this.commit(actor, need)) return false;
 		this.setActed(actor, true);
 		this.message = `${this.nameFor(actor)} calls $${need}.`;
 		this.endAction();
@@ -134,7 +148,7 @@ export abstract class PokerTableBase {
 		if (amount < minTarget && amount !== myMax && amount !== oppMax) {
 			return false;
 		}
-		this.commit(actor, amount - this.streetOf(actor));
+		if (!this.commit(actor, amount - this.streetOf(actor))) return false;
 		const raiseSize = amount - this.currentBet;
 		if (raiseSize > this.minRaise) this.minRaise = raiseSize;
 		this.currentBet = amount;
@@ -178,17 +192,24 @@ export abstract class PokerTableBase {
 		else this.dealerActed = value;
 	}
 
-	protected commit(actor: PokerActor, amount: number): void {
-		if (amount <= 0) return;
+	/**
+	 * Moves chips from a seat into the pot. Returns false (and leaves the state
+	 * untouched) when the seat cannot cover the amount, so a failed withdrawal
+	 * can never silently create chips out of nothing.
+	 */
+	protected commit(actor: PokerActor, amount: number): boolean {
+		if (amount <= 0) return true;
 		if (actor === "player") {
-			this.bank.withdraw(amount);
+			if (!this.bank.withdraw(amount)) return false;
 			this.playerStreet += amount;
 			this.playerTotal += amount;
 		} else {
+			if (this.dealerStack < amount) return false;
 			this.dealerStack -= amount;
 			this.dealerStreet += amount;
 			this.dealerTotal += amount;
 		}
+		return true;
 	}
 
 	protected draw(): Card {

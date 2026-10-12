@@ -25,9 +25,9 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 	const bank = useMemo<Bank>(
 		() => ({
 			getBalance: () => economy.getBalance(),
-			withdraw: (amount) => economy.buy(amount).success,
+			withdraw: (amount) => economy.withdrawChips(amount),
 			deposit: (amount) => {
-				economy.sell(amount);
+				economy.depositChips(amount);
 			},
 		}),
 		[],
@@ -61,17 +61,26 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 		[table],
 	);
 
+	// Walking away mid-hand settles it as a fold, so the pot is not silently
+	// abandoned with the player's committed chips still withdrawn.
+	const leave = useCallback(() => {
+		if (snapshot.phase === "playerTurn" || snapshot.phase === "dealerTurn") {
+			table.forfeit();
+		}
+		onClose();
+	}, [table, snapshot.phase, onClose]);
+
 	useEffect(() => {
 		if (snapshot.phase === "playerTurn") setRaiseTo(snapshot.minRaiseTo);
 	}, [snapshot.phase, snapshot.minRaiseTo]);
 
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape") onClose();
+			if (event.key === "Escape") leave();
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose]);
+	}, [leave]);
 
 	const clampRaise = (value: number) =>
 		Math.min(snapshot.maxRaiseTo, Math.max(snapshot.minRaiseTo, Math.floor(value)));
@@ -93,7 +102,7 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 						type="button"
 						className="bj-close"
 						data-testid="poker-close"
-						onClick={onClose}
+						onClick={leave}
 					>
 						Leave
 					</button>
@@ -109,18 +118,23 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 						Dealer · ${snapshot.dealerStack.toLocaleString()}
 					</span>
 					<div className="bj-hand">
-						{snapshot.dealerHole.map((card, i) => (
-							<PlayingCard
-								key={cardCode(card)}
-								card={card}
-								faceDown={snapshot.dealerHidden}
-								deal={isNew(
-									snapshot.dealerHidden ? `__dealer${i}__` : cardCode(card),
-								)}
-								dealDelay={i * 90}
-								deckRef={deckRef}
-							/>
-						))}
+						{/* Stable slot keys (d0/d1) keep the reveal a flip, not a re-deal. */}
+						{snapshot.dealerHole
+							.map((card, index) => ({ key: `d${index}`, card, index }))
+							.map((slot) => (
+								<PlayingCard
+									key={slot.key}
+									card={snapshot.dealerHidden ? undefined : slot.card}
+									faceDown={snapshot.dealerHidden}
+									deal={isNew(
+										snapshot.dealerHidden
+											? `__dealer${slot.index}__`
+											: cardCode(slot.card),
+									)}
+									dealDelay={slot.index * 90}
+									deckRef={deckRef}
+								/>
+							))}
 						{snapshot.dealerHole.length === 0 && (
 							<p className="bj-empty">No hand yet.</p>
 						)}
@@ -193,7 +207,7 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 							type="button"
 							className="bj-action"
 							data-testid="poker-leave"
-							onClick={onClose}
+							onClick={leave}
 						>
 							Leave table
 						</button>

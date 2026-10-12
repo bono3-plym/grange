@@ -127,14 +127,14 @@ export default function FarmMap() {
 	const [blackjackOpen, setBlackjackOpen] = useState(false);
 	const [pokerOpen, setPokerOpen] = useState(false);
 	const [rouletteOpen, setRouletteOpen] = useState(false);
-	const [worldReady, setWorldReady] = useState(false);
+	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas || !target) return;
 
 		let cancelled = false;
-		setWorldReady(false);
+		setEngineReady(false);
 		const engine = new ex.Engine({
 			canvasElement: canvas,
 			viewport: { width: MAP_WIDTH, height: MAP_HEIGHT },
@@ -149,7 +149,7 @@ export default function FarmMap() {
 		scene.onFarmUpdate = (snapshot) => {
 			if (cancelled) return;
 			setHud(snapshot);
-			setWorldReady(true);
+			setEngineReady(true);
 		};
 		sceneRef.current = scene;
 		engine.addScene("farm-map", scene);
@@ -242,6 +242,10 @@ export default function FarmMap() {
 		setPokerOpen(false);
 		setRouletteOpen(false);
 	}
+
+	// The farm channel join is what sets `farm`; until it lands, an action would
+	// be dropped by emitFarmAction, so the world isn't interactive yet.
+	const worldReady = engineReady && farm !== null;
 
 	return (
 		<main

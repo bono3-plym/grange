@@ -16,6 +16,13 @@ export class PokerTable extends PokerTableBase {
 			this.message = "Not enough Grangecoin for the big blind.";
 			return false;
 		}
+		// The dealer is the house; if its virtual stack can't cover the blind the
+		// table would post a negative bet and corrupt every later raise. Refuse
+		// the hand instead (the house is "busted" until a rebuy is added).
+		if (this.dealerStack < this.bigBlind) {
+			this.message = "The dealer can't cover the big blind.";
+			return false;
+		}
 		this.deck = this.riggedDeck ? [...this.riggedDeck] : [];
 		this.playerHole = [this.draw(), this.draw()];
 		this.dealerHole = [this.draw(), this.draw()];
@@ -32,8 +39,16 @@ export class PokerTable extends PokerTableBase {
 		this.minRaise = this.bigBlind;
 		this.playerActed = false;
 		this.dealerActed = false;
-		this.commit("player", this.smallBlind);
-		this.commit("dealer", this.bigBlind);
+		if (
+			!this.commit("player", this.smallBlind) ||
+			!this.commit("dealer", this.bigBlind)
+		) {
+			// Unreachable while the guards above hold, but never post a blind we
+			// cannot cover: bail out to a clean idle state.
+			this.phase = "idle";
+			this.message = "Could not post the blinds.";
+			return false;
+		}
 		this.street = "preflop";
 		this.phase = "playerTurn";
 		this.message = `You posted $${this.smallBlind}. Call $${this.currentBet - this.playerStreet} to see a flop.`;
