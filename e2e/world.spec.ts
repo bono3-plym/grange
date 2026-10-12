@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { BASE, register, resetServer, uniqueName } from "./helpers";
+import {
+	BASE,
+	register,
+	resetServer,
+	uniqueName,
+	walkUntilPrompt,
+} from "./helpers";
 
 test("farm world loads without asset or page errors", async ({ page }) => {
 	const pageErrors: string[] = [];
@@ -317,10 +323,7 @@ test("the blackjack table opens a playable sub-screen", async ({ page }) => {
 	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
 
 	// Walk down to the blackjack table and open the sub-screen.
-	await page.keyboard.down("s");
-	await page.waitForTimeout(800);
-	await page.keyboard.up("s");
-	await expect(prompt).toContainText("play blackjack");
+	await walkUntilPrompt(page, ["s"], "play blackjack");
 	await page.keyboard.press("e");
 
 	const overlay = page.getByTestId("blackjack-overlay");

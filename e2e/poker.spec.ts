@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { register, resetServer, uniqueName } from "./helpers";
+import {
+	register,
+	resetServer,
+	uniqueName,
+	walkUntilPrompt,
+} from "./helpers";
 
 test("the poker table opens a playable sub-screen", async ({ page }) => {
 	await resetServer();
@@ -30,14 +35,14 @@ test("the poker table opens a playable sub-screen", async ({ page }) => {
 	await page.keyboard.press("e");
 	await expect(canvas).toHaveAttribute("aria-label", /^Casino map/);
 
-	// Walk down then left to the poker table and open the sub-screen.
+	// Anchor on the blackjack prompt (same table row), drift down into the row,
+	// then move left until the poker prompt shows. Polling while moving keeps
+	// this reliable when slow frames shorten each fixed step.
+	await walkUntilPrompt(page, ["s"], "play blackjack");
 	await page.keyboard.down("s");
-	await page.waitForTimeout(1_300);
+	await page.waitForTimeout(700);
 	await page.keyboard.up("s");
-	await page.keyboard.down("a");
-	await page.waitForTimeout(1_800);
-	await page.keyboard.up("a");
-	await expect(prompt).toContainText("play poker");
+	await walkUntilPrompt(page, ["a"], "play poker");
 	await page.keyboard.press("e");
 
 	const overlay = page.getByTestId("poker-overlay");

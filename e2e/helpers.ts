@@ -89,6 +89,27 @@ export async function login(
 	await enterFarm(page);
 }
 
+/**
+ * Holds the given movement keys until the travel prompt contains `text`, then
+ * releases them. Polling while moving keeps navigation reliable on slow CI
+ * runners: Excalibur clamps per-frame delta, so a fixed hold covers less
+ * ground there and the player can stop short of the interaction radius.
+ */
+export async function walkUntilPrompt(
+	page: Page,
+	keys: string[],
+	text: string,
+	timeout = 10_000,
+): Promise<void> {
+	const prompt = page.getByTestId("travel-prompt");
+	for (const key of keys) await page.keyboard.down(key);
+	try {
+		await expect(prompt).toContainText(text, { timeout });
+	} finally {
+		for (const key of keys) await page.keyboard.up(key);
+	}
+}
+
 /** Walks from the farm spawn through the marketplace and into the casino. */
 export async function walkToCasino(page: Page): Promise<void> {
 	const canvas = page.locator("canvas");
