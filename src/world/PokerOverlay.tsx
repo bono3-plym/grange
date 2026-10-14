@@ -33,7 +33,9 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 		[],
 	);
 	const [table] = useState(() => new PokerTable(bank));
-	const [snapshot, setSnapshot] = useState<PokerSnapshot>(() => table.snapshot());
+	const [snapshot, setSnapshot] = useState<PokerSnapshot>(() =>
+		table.snapshot(),
+	);
 	const [raiseTo, setRaiseTo] = useState(0);
 
 	const deckRef = useRef<HTMLDivElement>(null);
@@ -83,13 +85,20 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 	}, [leave]);
 
 	const clampRaise = (value: number) =>
-		Math.min(snapshot.maxRaiseTo, Math.max(snapshot.minRaiseTo, Math.floor(value)));
+		Math.min(
+			snapshot.maxRaiseTo,
+			Math.max(snapshot.minRaiseTo, Math.floor(value)),
+		);
 
 	const canBet = snapshot.phase === "playerTurn";
 
 	return (
 		<div className="bj-overlay" data-testid="poker-overlay">
-			<div className="bj-panel poker-panel" role="dialog" aria-label="Poker table">
+			<div
+				className="bj-panel poker-panel"
+				role="dialog"
+				aria-label="Poker table"
+			>
 				<header className="bj-header">
 					<h2 className="bj-title">Texas Hold'em</h2>
 					<span className="pk-pot" data-testid="poker-pot">
@@ -98,6 +107,7 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 					<span className="bj-balance" data-testid="poker-balance">
 						${snapshot.balance.toLocaleString()}
 					</span>
+					<Deck deckRef={deckRef} testId="poker-deck" />
 					<button
 						type="button"
 						className="bj-close"
@@ -108,86 +118,83 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 					</button>
 				</header>
 
-				<div className="bj-deck-row">
-					<span className="bj-deck-label">Deck</span>
-					<Deck deckRef={deckRef} testId="poker-deck" />
-				</div>
+				<div className="bj-scroll">
+					<section className="bj-seat" data-testid="poker-dealer">
+						<span className="bj-seat-name">
+							Dealer · ${snapshot.dealerStack.toLocaleString()}
+						</span>
+						<div className="bj-hand">
+							{/* Stable slot keys (d0/d1) keep the reveal a flip, not a re-deal. */}
+							{snapshot.dealerHole
+								.map((card, index) => ({ key: `d${index}`, card, index }))
+								.map((slot) => (
+									<PlayingCard
+										key={slot.key}
+										card={snapshot.dealerHidden ? undefined : slot.card}
+										faceDown={snapshot.dealerHidden}
+										deal={isNew(
+											snapshot.dealerHidden
+												? `__dealer${slot.index}__`
+												: cardCode(slot.card),
+										)}
+										dealDelay={slot.index * 90}
+										deckRef={deckRef}
+									/>
+								))}
+							{snapshot.dealerHole.length === 0 && (
+								<p className="bj-empty">No hand yet.</p>
+							)}
+						</div>
+						<span className="bj-total">
+							{snapshot.dealerHidden
+								? "Hole cards hidden"
+								: `Best: ${bestLabel(snapshot.dealerBest)}`}
+						</span>
+					</section>
 
-				<section className="bj-seat" data-testid="poker-dealer">
-					<span className="bj-seat-name">
-						Dealer · ${snapshot.dealerStack.toLocaleString()}
-					</span>
-					<div className="bj-hand">
-						{/* Stable slot keys (d0/d1) keep the reveal a flip, not a re-deal. */}
-						{snapshot.dealerHole
-							.map((card, index) => ({ key: `d${index}`, card, index }))
-							.map((slot) => (
-								<PlayingCard
-									key={slot.key}
-									card={snapshot.dealerHidden ? undefined : slot.card}
-									faceDown={snapshot.dealerHidden}
-									deal={isNew(
-										snapshot.dealerHidden
-											? `__dealer${slot.index}__`
-											: cardCode(slot.card),
-									)}
-									dealDelay={slot.index * 90}
-									deckRef={deckRef}
-								/>
-							))}
-						{snapshot.dealerHole.length === 0 && (
-							<p className="bj-empty">No hand yet.</p>
-						)}
-					</div>
-					<span className="bj-total">
-						{snapshot.dealerHidden
-							? "Hole cards hidden"
-							: `Best: ${bestLabel(snapshot.dealerBest)}`}
-					</span>
-				</section>
-
-				<div className="poker-community" data-testid="poker-community">
-					{snapshot.community.map((card, i) => (
-						<PlayingCard
-							key={cardCode(card)}
-							card={card}
-							deal={isNew(cardCode(card))}
-							dealDelay={i * 80}
-							deckRef={deckRef}
-						/>
-					))}
-					{EMPTY_SLOTS.slice(snapshot.community.length).map((key) => (
-						<div className="poker-slot" key={key} aria-hidden="true" />
-					))}
-				</div>
-
-				<section
-					className={
-						snapshot.winner === "player"
-							? "bj-seat poker-player poker-player-win"
-							: "bj-seat poker-player"
-					}
-					data-testid="poker-player"
-				>
-					<span className="bj-seat-name">You</span>
-					<div className="bj-hand" data-testid="poker-player-hand">
-						{snapshot.playerHole.map((card, i) => (
+					<div className="poker-community" data-testid="poker-community">
+						{snapshot.community.map((card, i) => (
 							<PlayingCard
 								key={cardCode(card)}
 								card={card}
 								deal={isNew(cardCode(card))}
-								dealDelay={i * 90}
+								dealDelay={i * 80}
 								deckRef={deckRef}
 							/>
 						))}
+						{EMPTY_SLOTS.slice(snapshot.community.length).map((key) => (
+							<div className="poker-slot" key={key} aria-hidden="true" />
+						))}
 					</div>
-					<span className="bj-total">
-						Best: {bestLabel(snapshot.playerBest)}
-						{snapshot.playerCommitted > 0
-							? ` · committed $${snapshot.playerCommitted}`
-							: ""}
-					</span>
-				</section>
+
+					<section
+						className={
+							snapshot.winner === "player"
+								? "bj-seat poker-player poker-player-win"
+								: "bj-seat poker-player"
+						}
+						data-testid="poker-player"
+					>
+						<span className="bj-seat-name">You</span>
+						<div className="bj-hand" data-testid="poker-player-hand">
+							{snapshot.playerHole.map((card, i) => (
+								<PlayingCard
+									key={cardCode(card)}
+									card={card}
+									deal={isNew(cardCode(card))}
+									dealDelay={i * 90}
+									deckRef={deckRef}
+								/>
+							))}
+						</div>
+						<span className="bj-total">
+							Best: {bestLabel(snapshot.playerBest)}
+							{snapshot.playerCommitted > 0
+								? ` · committed $${snapshot.playerCommitted}`
+								: ""}
+						</span>
+					</section>
+				</div>
 
 				<p className="bj-message" data-testid="poker-message">
 					{snapshot.message}
@@ -259,7 +266,9 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 										type="button"
 										className="bj-chip"
 										onClick={() =>
-											setRaiseTo(clampRaise(snapshot.currentBet + snapshot.pot * 0.5))
+											setRaiseTo(
+												clampRaise(snapshot.currentBet + snapshot.pot * 0.5),
+											)
 										}
 									>
 										½ Pot
