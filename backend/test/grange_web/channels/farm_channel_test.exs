@@ -66,7 +66,7 @@ defmodule GrangeWeb.FarmChannelTest do
     FarmStore.action("Alice", %{"kind" => "plant", "x" => 1, "y" => 1})
     FarmStore.action("Alice", %{"kind" => "water", "x" => 1, "y" => 1})
 
-    future = System.monotonic_time(:millisecond) + Farm.grow_ms() + 60_000
+    future = System.system_time(:millisecond) + Farm.grow_ms() + 60_000
     FarmStore.tick(future)
     FarmStore.action("Alice", %{"kind" => "harvest", "x" => 1, "y" => 1})
 

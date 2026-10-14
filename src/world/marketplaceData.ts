@@ -52,6 +52,6 @@ export const marketplaceProps: RenderedProp<MarketplacePropKey>[] = [
 	{ asset: "pine-tree", x: 1090, y: 200, width: 100 },
 	{ asset: "daisies", x: 505, y: 465, width: 45 },
 	{ asset: "marigolds", x: 765, y: 675, width: 45 },
-	{ asset: "barrel", x: 475, y: 510, width: 48 },
-	{ asset: "crate", x: 535, y: 510, width: 52 },
+	{ asset: "barrel", x: 490, y: 510, width: 48 },
+	{ asset: "crate", x: 550, y: 510, width: 52 },
 ];

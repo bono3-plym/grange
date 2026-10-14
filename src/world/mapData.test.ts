@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+	FARM_TRAIN_ENGINE_STOP,
 	FARM_TRAIN_STOP,
+	isNearFarmTrain,
+	isTillableTile,
 	MAP_COLUMNS,
 	MAP_HEIGHT,
 	MAP_ROWS,
 	MAP_WIDTH,
-	TILE_SIZE,
-	isTillableTile,
 	propBlocking,
 	props,
+	TILE_SIZE,
 	terrainAt,
 } from "./mapData";
 
@@ -80,5 +82,14 @@ describe("farm map data", () => {
 		expect(FARM_TRAIN_STOP.x).toBeLessThanOrEqual(MAP_WIDTH);
 		expect(FARM_TRAIN_STOP.y).toBeGreaterThanOrEqual(0);
 		expect(FARM_TRAIN_STOP.y).toBeLessThanOrEqual(MAP_HEIGHT);
+		expect(FARM_TRAIN_ENGINE_STOP.x).toBeLessThanOrEqual(MAP_WIDTH);
+	});
+
+	it("offers train travel beside both the cart and engine", () => {
+		expect(isNearFarmTrain(790, 530)).toBe(true);
+		expect(isNearFarmTrain(925, 530)).toBe(true);
+		expect(isNearFarmTrain(1050, 530)).toBe(true);
+		expect(isNearFarmTrain(1130, 530)).toBe(true);
+		expect(isNearFarmTrain(1060, 450)).toBe(false);
 	});
 });

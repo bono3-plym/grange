@@ -1,7 +1,9 @@
 import * as ex from "excalibur";
+import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import { InputManager } from "./InputManager";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { updateWalkingPlayer } from "./playerMovement";
+import type { WalkObstacle } from "./walkCollisions";
 
 export type WorldArea = "Farm" | "Marketplace" | "Casino";
 export type WorldSceneName = "farm-map" | "marketplace" | "casino";
@@ -30,6 +32,7 @@ interface WalkingSceneOptions {
 	area: WorldArea;
 	spawn: ex.Vector;
 	interactions: SceneInteraction[];
+	obstacles: WalkObstacle[];
 	onAreaChange: (area: WorldArea) => void;
 	onPromptChange: (prompt: string | null) => void;
 }
@@ -51,10 +54,10 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			pos: this.options.spawn.clone(),
 			width: 32,
 			height: 32,
-			color: ex.Color.fromHex("#ffcc00"),
 			anchor: ex.vec(0.5, 1),
 			z: 200,
 		});
+		addFarmerGraphics(this.player);
 		this.add(this.player);
 		this.camera.pos = ex.vec(MAP_WIDTH / 2, MAP_HEIGHT / 2);
 	}
@@ -87,10 +90,17 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		}
 	}
 
-	override onPreUpdate(engine: ex.Engine): void {
+	override onPreUpdate(engine: ex.Engine, delta: number): void {
 		if (!this.inputManager || this.paused) return;
 		const direction = this.inputManager.getMovementVector();
-		updateWalkingPlayer(this.player, direction, this.playerSpeed);
+		updateWalkingPlayer(
+			this.player,
+			direction,
+			this.playerSpeed,
+			delta,
+			this.options.obstacles,
+		);
+		updateFarmerGraphics(this.player, direction);
 
 		const interaction = this.options.interactions.find(
 			(candidate) =>

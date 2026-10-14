@@ -1,5 +1,10 @@
 import Config
 
+config :grange, ecto_repos: [Grange.Repo]
+
+# Crops ripen on a timer in dev/prod; tests drive `FarmStore.tick/1` directly.
+config :grange, start_ticker: true
+
 config :grange, GrangeWeb.Endpoint,
   adapter: Bandit.PhoenixAdapter,
   url: [host: "localhost"],

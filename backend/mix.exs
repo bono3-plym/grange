@@ -11,6 +11,7 @@ defmodule Grange.MixProject do
       test_ignore_filters: [
         &String.starts_with?(&1, "test/support/credo/")
       ],
+      aliases: aliases(),
       deps: deps()
     ]
   end
@@ -18,6 +19,13 @@ defmodule Grange.MixProject do
   def cli do
     [
       preferred_envs: [precommit: :test]
+    ]
+  end
+
+  defp aliases do
+    [
+      "ecto.setup": ["ecto.create --quiet", "ecto.migrate --quiet"],
+      "ecto.reset": ["ecto.drop --quiet", "ecto.setup"]
     ]
   end
 
@@ -48,6 +56,8 @@ defmodule Grange.MixProject do
       {:jason, "~> 1.4"},
       {:bandit, "~> 1.5"},
       {:argon2_elixir, "~> 4.0"},
+      {:ecto_sql, "~> 3.12"},
+      {:ecto_sqlite3, "~> 0.17"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end

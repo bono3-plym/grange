@@ -1,5 +1,6 @@
 import * as ex from "excalibur";
 import type { PropKey, TerrainKey } from "./mapData";
+import { farmerImage } from "./farmerSprite";
 
 export const image = (path: string) =>
 	new ex.ImageSource(`/assets/${path}`, {
@@ -38,6 +39,7 @@ export const propImages: Record<PropKey, ex.ImageSource> = {
 
 export const resources = [
 	terrainImage,
+	farmerImage,
 	...Object.values(propImages),
 	...Object.values(cropImages),
 ];

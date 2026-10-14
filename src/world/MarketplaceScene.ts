@@ -10,6 +10,7 @@ import {
 	marketplaceTerrainAt,
 } from "./marketplaceData";
 import { marketplaceImages } from "./marketplaceResources";
+import { marketplaceWalkObstacles } from "./sceneObstacles";
 import { addProps, addTerrain } from "./sceneRendering";
 import { WalkingScene, type WorldArea } from "./WalkingScene";
 
@@ -22,6 +23,7 @@ export class MarketplaceScene extends WalkingScene {
 		super({
 			area: "Marketplace",
 			spawn: ex.vec(MARKETPLACE_PLAYER_SPAWN.x, MARKETPLACE_PLAYER_SPAWN.y),
+			obstacles: marketplaceWalkObstacles,
 			interactions: [
 				{
 					position: ex.vec(MARKETPLACE_TRAIN_STOP.x, MARKETPLACE_TRAIN_STOP.y),
@@ -35,7 +37,7 @@ export class MarketplaceScene extends WalkingScene {
 					),
 					destination: "casino",
 					prompt: "Press E or Enter to enter the casino",
-					radius: 90,
+					radius: 105,
 				},
 				{
 					position: ex.vec(

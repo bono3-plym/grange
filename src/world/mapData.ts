@@ -84,6 +84,16 @@ export function worldToFieldTile(
 
 export const FARM_PLAYER_SPAWN = { x: 576, y: 620 } as const;
 export const FARM_TRAIN_STOP = { x: 810, y: 600 } as const;
+export const FARM_TRAIN_ENGINE_STOP = { x: 1070, y: 600 } as const;
+
+/** The cart and engine share one continuous boarding area. */
+export function isNearFarmTrain(x: number, y: number): boolean {
+	const nearestX = Math.max(
+		FARM_TRAIN_STOP.x,
+		Math.min(x, FARM_TRAIN_ENGINE_STOP.x),
+	);
+	return Math.hypot(x - nearestX, y - FARM_TRAIN_STOP.y) <= 115;
+}
 
 /** Edit these rules to redraw the 64px terrain grid. */
 export function terrainAt(column: number, row: number): TerrainKey {

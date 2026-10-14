@@ -1,61 +1,26 @@
 defmodule Grange.Accounts do
   @moduledoc """
-  In-memory accounts and sessions.
+  Accounts and sessions, persisted in the database.
 
-  Users and sessions live in one GenServer so mutations are serialized. Session
-  tokens are handed to the client as opaque strings; only a SHA-256 hash is
-  stored, so a memory dump cannot be replayed.
+  Validation messages match the previous in-memory implementation so the SPA
+  and tests see the same contract. Session tokens are handed to the client as
+  opaque strings; only a SHA-256 hash is stored, so a database leak cannot be
+  replayed.
   """
 
-  use GenServer
+  import Ecto.Query
 
-  alias Grange.User
+  alias Grange.{Repo, Session, User}
 
   @username_re ~r/^[a-zA-Z0-9_-]{3,32}$/
   @email_re ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/
   @min_password 8
   @token_bytes 32
-  @ttl_ms 30 * 24 * 60 * 60 * 1000
+  @ttl_seconds 30 * 24 * 60 * 60
   @lobby_topic "lobby"
 
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
-
   @spec register(map()) :: {:ok, User.t()} | {:error, String.t()}
-  def register(attrs), do: GenServer.call(__MODULE__, {:register, attrs})
-
-  @spec authenticate(String.t(), String.t()) :: {:ok, User.t()} | {:error, String.t()}
-  def authenticate(username, password),
-    do: GenServer.call(__MODULE__, {:authenticate, username, password})
-
-  @spec create_session(String.t()) :: String.t()
-  def create_session(user_id), do: GenServer.call(__MODULE__, {:create_session, user_id})
-
-  @spec resolve_token(String.t() | nil) :: {:ok, User.t()} | :error
-  def resolve_token(token), do: GenServer.call(__MODULE__, {:resolve_token, token})
-
-  @spec destroy_session(String.t() | nil) :: :ok
-  def destroy_session(token), do: GenServer.call(__MODULE__, {:destroy_session, token})
-
-  @spec list_users() :: [User.t()]
-  def list_users, do: GenServer.call(__MODULE__, :list_users)
-
-  @spec apply_balance_delta(String.t(), integer()) ::
-          {:ok, non_neg_integer()} | {:error, String.t()}
-  def apply_balance_delta(user_id, delta),
-    do: GenServer.call(__MODULE__, {:apply_balance_delta, user_id, delta})
-
-  @spec reset() :: :ok
-  def reset, do: GenServer.call(__MODULE__, :reset)
-
-  @impl true
-  def init(_opts) do
-    {:ok, %{users: %{}, by_username: %{}, by_email: %{}, sessions: %{}}}
-  end
-
-  @impl true
-  def handle_call({:register, attrs}, _from, state) do
+  def register(attrs) do
     username = attrs |> fetch(:username) |> String.trim()
     email = attrs |> fetch(:email) |> String.trim() |> String.downcase()
     password = fetch(attrs, :password)
@@ -63,128 +28,127 @@ defmodule Grange.Accounts do
     with :ok <- validate_username(username),
          :ok <- validate_email(email),
          :ok <- validate_password(password),
-         :ok <- ensure_unique(state, username, email) do
-      user = User.new(%{username: username, email: email, password_hash: hash(password)})
-      state = put_user(state, user)
-      broadcast_players(state)
-      {:reply, {:ok, user}, state}
-    else
-      {:error, reason} -> {:reply, {:error, reason}, state}
+         :ok <- ensure_unique(username, email) do
+      insert_user(username, email, password)
     end
   end
 
-  def handle_call({:authenticate, username, password}, _from, state) do
-    user_id = Map.get(state.by_username, username)
-    user = user_id && Map.get(state.users, user_id)
-
-    case user do
+  @spec authenticate(String.t(), String.t()) :: {:ok, User.t()} | {:error, String.t()}
+  def authenticate(username, password) do
+    case Repo.get_by(User, username: username) do
       nil ->
         # Hash anyway so a missing account takes the same time as a wrong password.
         _ = hash(password)
-        {:reply, {:error, "invalid username or password"}, state}
+        {:error, "invalid username or password"}
 
-      %User{} ->
+      %User{} = user ->
         if Argon2.verify_pass(password, user.password_hash) do
-          {:reply, {:ok, user}, state}
+          {:ok, user}
         else
-          {:reply, {:error, "invalid username or password"}, state}
+          {:error, "invalid username or password"}
         end
     end
   end
 
-  def handle_call({:create_session, user_id}, _from, state) do
+  @spec create_session(String.t()) :: String.t()
+  def create_session(user_id) do
     token = :crypto.strong_rand_bytes(@token_bytes) |> Base.url_encode64(padding: false)
-    expires_at = now_ms() + @ttl_ms
 
-    sessions =
-      Map.put(state.sessions, hash_token(token), %{user_id: user_id, expires_at: expires_at})
+    %Session{
+      token_hash: hash_token(token),
+      user_id: user_id,
+      expires_at: DateTime.add(DateTime.utc_now(), @ttl_seconds, :second)
+    }
+    |> Repo.insert!()
 
-    {:reply, token, %{state | sessions: sessions}}
+    token
   end
 
-  def handle_call({:resolve_token, token}, _from, state) when token in [nil, ""] do
-    {:reply, :error, state}
-  end
+  @spec resolve_token(String.t() | nil) :: {:ok, User.t()} | :error
+  def resolve_token(token) when token in [nil, ""], do: :error
 
-  def handle_call({:resolve_token, token}, _from, state) do
-    key = hash_token(token)
-
-    case Map.get(state.sessions, key) do
-      nil ->
-        {:reply, :error, state}
-
-      session ->
-        resolve_session(state, session, key)
+  def resolve_token(token) do
+    case Repo.get(Session, hash_token(token)) do
+      nil -> :error
+      session -> resolve_session(session)
     end
   end
 
-  def handle_call({:destroy_session, token}, _from, state) when token in [nil, ""] do
-    {:reply, :ok, state}
+  @spec destroy_session(String.t() | nil) :: :ok
+  def destroy_session(token) when token in [nil, ""], do: :ok
+
+  def destroy_session(token) do
+    Repo.delete_all(from(s in Session, where: s.token_hash == ^hash_token(token)))
+    :ok
   end
 
-  def handle_call({:destroy_session, token}, _from, state) do
-    {:reply, :ok, %{state | sessions: Map.delete(state.sessions, hash_token(token))}}
-  end
+  @spec list_users() :: [User.t()]
+  def list_users, do: Repo.all(from(u in User, order_by: u.username))
 
-  def handle_call(:list_users, _from, state) do
-    users = state.users |> Map.values() |> Enum.sort_by(& &1.username)
-    {:reply, users, state}
-  end
-
-  def handle_call({:apply_balance_delta, user_id, delta}, _from, state) do
-    case Map.get(state.users, user_id) do
+  @spec apply_balance_delta(String.t(), integer()) ::
+          {:ok, non_neg_integer()} | {:error, String.t()}
+  def apply_balance_delta(user_id, delta) when is_integer(delta) do
+    case Repo.get(User, user_id) do
       nil ->
-        {:reply, {:error, "unknown user"}, state}
+        {:error, "unknown user"}
 
       %User{} = user ->
-        update_balance(state, user, delta)
-    end
-  end
-
-  def handle_call(:reset, _from, _state) do
-    {:reply, :ok, %{users: %{}, by_username: %{}, by_email: %{}, sessions: %{}}}
-  end
-
-  defp resolve_session(state, session, key) do
-    if now_ms() >= session.expires_at do
-      {:reply, :error, %{state | sessions: Map.delete(state.sessions, key)}}
-    else
-      case Map.get(state.users, session.user_id) do
-        nil -> {:reply, :error, state}
-        user -> {:reply, {:ok, user}, state}
-      end
-    end
-  end
-
-  # Applies a spend/earn delta, clamping at zero, and returns the new balance.
-  defp update_balance(state, user, delta) do
-    case validate_delta(delta) do
-      :ok ->
+        # Spend/earn delta, clamped at zero so a balance can never go negative.
         balance = max(0, user.balance + delta)
-        {:reply, {:ok, balance}, put_user(state, %{user | balance: balance})}
-
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
+        user |> Ecto.Changeset.change(balance: balance) |> Repo.update!()
+        {:ok, balance}
     end
   end
 
-  defp validate_delta(delta) when is_integer(delta), do: :ok
-  defp validate_delta(_delta), do: {:error, "delta must be an integer"}
+  def apply_balance_delta(_user_id, _delta), do: {:error, "delta must be an integer"}
 
-  defp put_user(state, user) do
-    %{
-      state
-      | users: Map.put(state.users, user.id, user),
-        by_username: Map.put(state.by_username, user.username, user.id),
-        by_email: Map.put(state.by_email, user.email, user.id)
-    }
+  @spec reset() :: :ok
+  def reset do
+    Repo.delete_all(Session)
+    Repo.delete_all(User)
+    :ok
   end
 
-  defp ensure_unique(state, username, email) do
+  defp resolve_session(session) do
+    if DateTime.compare(DateTime.utc_now(), session.expires_at) == :lt do
+      case Repo.get(User, session.user_id) do
+        nil -> :error
+        user -> {:ok, user}
+      end
+    else
+      Repo.delete(session)
+      :error
+    end
+  end
+
+  defp insert_user(username, email, password) do
+    attrs = %{username: username, email: email, password_hash: hash(password)}
+
+    case %User{id: User.id()} |> User.changeset(attrs) |> Repo.insert() do
+      {:ok, user} ->
+        broadcast_players()
+        {:ok, user}
+
+      {:error, changeset} ->
+        {:error, error_message(changeset)}
+    end
+  end
+
+  defp error_message(changeset) do
+    changeset.errors
+    |> Enum.map_join(", ", fn {_field, {message, _opts}} -> message end)
+  end
+
+  defp ensure_unique(username, email) do
     cond do
-      Map.has_key?(state.by_username, username) -> {:error, "that username is taken"}
-      Map.has_key?(state.by_email, email) -> {:error, "that email is already registered"}
-      true -> :ok
+      Repo.exists?(from(u in User, where: u.username == ^username)) ->
+        {:error, "that username is taken"}
+
+      Repo.exists?(from(u in User, where: u.email == ^email)) ->
+        {:error, "that email is already registered"}
+
+      true ->
+        :ok
     end
   end
 
@@ -226,10 +190,8 @@ defmodule Grange.Accounts do
 
   defp hash_token(token), do: :crypto.hash(:sha256, token) |> Base.encode16(case: :lower)
 
-  defp now_ms, do: System.monotonic_time(:millisecond)
-
-  defp broadcast_players(state) do
-    players = state.users |> Map.values() |> Enum.map(&%{name: &1.username})
+  defp broadcast_players do
+    players = list_users() |> Enum.map(&%{name: &1.username})
     GrangeWeb.Endpoint.broadcast(@lobby_topic, "players", %{players: players})
   end
 end

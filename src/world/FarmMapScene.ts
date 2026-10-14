@@ -3,32 +3,32 @@ import type { FarmTileState, FarmToolId } from "../../shared/farm";
 import { isFarmInBounds } from "../../shared/farm";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
-import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import {
-	BlockRegistry,
-	decorByTile,
-	groundFootprintTiles,
-	rectFootprintTiles,
-} from "./blocking";
+	countItem,
+	isInventoryBlockingInput,
+	useInventoryStore,
+} from "../inventory/inventoryStore";
+import { BlockRegistry, decorByTile } from "./blocking";
 import { CropLayer } from "./cropLayer";
 import { FarmTravel } from "./FarmTravel";
+import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
+import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
+import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
 import { InputManager } from "./InputManager";
 import {
 	FARM_PLAYER_SPAWN,
+	isTillableTile,
 	MAP_COLUMNS,
 	MAP_HEIGHT,
 	MAP_ROWS,
 	MAP_WIDTH,
-	TILE_SIZE,
-	isTillableTile,
-	propBlocking,
 	props,
+	TILE_SIZE,
 	terrainAt,
 } from "./mapData";
-import { propImages, terrainFrames, terrainImage } from "./resources";
-import { updateWalkingPlayer } from "./playerMovement";
-import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
-import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
+import { updateFarmPlayer } from "./playerMovement";
+import { addFarmProps } from "./propLayer";
+import { terrainFrames, terrainImage } from "./resources";
 import { clearDecorAt, refreshTile } from "./tileSync";
 import type { WorldArea } from "./WalkingScene";
 
@@ -37,7 +37,6 @@ export class FarmMapScene extends ex.Scene {
 
 	private inputManager!: InputManager;
 	private player!: ex.Actor;
-	private readonly playerSpeed = 160; // Pixels per second
 
 	private sheet!: ex.SpriteSheet;
 	private terrain!: ex.TileMap;
@@ -107,44 +106,17 @@ export class FarmMapScene extends ex.Scene {
 		this.add(this.terrain);
 
 		// 3. Populate Props and register their tool-blocked tiles
-		props.forEach((prop, index) => {
-			const source = propImages[prop.asset];
-			const sprite = source.toSprite();
-			const scale = prop.width / source.width;
-			sprite.scale = ex.vec(scale, scale);
-
-			const actor = new ex.Actor({
-				pos: ex.vec(prop.x, prop.y),
-				anchor: ex.vec(0.5, 1),
-				z: 100 + Math.floor(prop.y),
-			});
-			actor.graphics.use(sprite);
-			this.add(actor);
-			this.propActors[index] = actor;
-
-			const rule = propBlocking[prop.asset];
-			if (rule === "rect") {
-				this.blocks.add(
-					`prop-${index}`,
-					rectFootprintTiles(prop.x, prop.y, prop.width, source.height * scale),
-				);
-			} else if (rule === "base") {
-				this.blocks.add(
-					`prop-${index}`,
-					groundFootprintTiles(prop.x, prop.y, prop.width),
-				);
-			}
-		});
+		addFarmProps(this, this.blocks, this.propActors);
 
 		// 4. Create Player Actor
 		this.player = new ex.Actor({
 			pos: ex.vec(FARM_PLAYER_SPAWN.x, FARM_PLAYER_SPAWN.y),
 			width: 32,
 			height: 32,
-			color: ex.Color.fromHex("#ffcc00"), // Yellow box placeholder or attach player sprite
 			anchor: ex.vec(0.5, 1),
 			z: 200,
 		});
+		addFarmerGraphics(this.player);
 		this.add(this.player);
 
 		// 5. Tool input: click or drag to act on field tiles via the server
@@ -183,17 +155,19 @@ export class FarmMapScene extends ex.Scene {
 		this.travel.activate();
 	}
 
-	override onPreUpdate(engine: ex.Engine, _delta: number): void {
+	override onPreUpdate(engine: ex.Engine, delta: number): void {
 		// Freeze movement while the inventory modal captures input.
 		if (isInventoryBlockingInput()) {
 			this.player.vel = ex.vec(0, 0);
+			updateFarmerGraphics(this.player, { x: 0, y: 0 });
 			return;
 		}
 
 		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
 
-		updateWalkingPlayer(this.player, dir, this.playerSpeed);
+		updateFarmPlayer(this.player, dir, delta);
+		updateFarmerGraphics(this.player, dir);
 
 		this.travel.update(this.player, this.inputManager, engine);
 
@@ -222,11 +196,33 @@ export class FarmMapScene extends ex.Scene {
 		const row = Math.floor(this.player.pos.y / TILE_SIZE);
 		if (!isFarmInBounds(column, row)) return;
 		const tool = useGameStore.getState().tool;
+		if (tool === "seed" && !this.consumeSeedAt(column, row)) return;
 		emitFarmAction(this.owner, {
 			kind: TOOL_KIND[tool],
 			x: column,
 			y: row,
 		});
+	}
+
+	/** Spends one seed to plant at (column, row). Returns false (with a HUD
+	 * message) when the tile is not tilled or the player is out of seeds. */
+	private consumeSeedAt(column: number, row: number): boolean {
+		const tile = useGameStore
+			.getState()
+			.activeFarm?.tiles.find((t) => t.x === column && t.y === row);
+		if (tile?.state !== "tilled") {
+			this.message = "Plant seeds in tilled soil.";
+			this.emitHud();
+			return false;
+		}
+		const inventory = useInventoryStore.getState();
+		if (countItem(inventory, "seed-bag") < 1) {
+			this.message = "Out of seeds — buy more at the market.";
+			this.emitHud();
+			return false;
+		}
+		inventory.removeItem("seed-bag", 1);
+		return true;
 	}
 
 	private applyToolAt(worldPos: ex.Vector): void {
@@ -269,6 +265,8 @@ export class FarmMapScene extends ex.Scene {
 			this.emitHud();
 			return;
 		}
+
+		if (tool === "seed" && !this.consumeSeedAt(column, row)) return;
 
 		emitFarmAction(this.owner, {
 			kind: TOOL_KIND[tool],

@@ -1,6 +1,6 @@
-import * as ex from "excalibur";
+import type * as ex from "excalibur";
 import type { InputManager } from "./InputManager";
-import { FARM_TRAIN_STOP } from "./mapData";
+import { isNearFarmTrain } from "./mapData";
 import type { WorldArea } from "./WalkingScene";
 
 export class FarmTravel {
@@ -19,8 +19,7 @@ export class FarmTravel {
 	}
 
 	update(player: ex.Actor, input: InputManager, engine: ex.Engine): void {
-		const nearTrain =
-			player.pos.distance(ex.vec(FARM_TRAIN_STOP.x, FARM_TRAIN_STOP.y)) <= 115;
+		const nearTrain = isNearFarmTrain(player.pos.x, player.pos.y);
 		this.setPrompt(
 			nearTrain ? "Press E or Enter to travel to the marketplace" : null,
 		);
