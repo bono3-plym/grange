@@ -27,6 +27,7 @@ import { marketplaceResources } from "./marketplaceResources";
 import { PokerOverlay } from "./PokerOverlay";
 import { RouletteOverlay } from "./RouletteOverlay";
 import { resources } from "./resources";
+import { SlotsOverlay } from "./SlotsOverlay";
 import { useFarmMarket } from "./useFarmMarket";
 import type { WorldArea } from "./WalkingScene";
 
@@ -127,6 +128,7 @@ export default function FarmMap() {
 	const [blackjackOpen, setBlackjackOpen] = useState(false);
 	const [pokerOpen, setPokerOpen] = useState(false);
 	const [rouletteOpen, setRouletteOpen] = useState(false);
+	const [slotsOpen, setSlotsOpen] = useState(false);
 	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
@@ -174,6 +176,10 @@ export default function FarmMap() {
 			() => {
 				casino.setPaused(true);
 				setRouletteOpen(true);
+			},
+			() => {
+				casino.setPaused(true);
+				setSlotsOpen(true);
 			},
 		);
 		casinoRef.current = casino;
@@ -241,6 +247,7 @@ export default function FarmMap() {
 		setBlackjackOpen(false);
 		setPokerOpen(false);
 		setRouletteOpen(false);
+		setSlotsOpen(false);
 	}
 
 	// The farm channel join is what sets `farm`; until it lands, an action would
@@ -311,6 +318,7 @@ export default function FarmMap() {
 			{blackjackOpen && <BlackjackOverlay onClose={closeCasinoOverlay} />}
 			{pokerOpen && <PokerOverlay onClose={closeCasinoOverlay} />}
 			{rouletteOpen && <RouletteOverlay onClose={closeCasinoOverlay} />}
+			{slotsOpen && <SlotsOverlay onClose={closeCasinoOverlay} />}
 		</main>
 	);
 }
