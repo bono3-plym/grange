@@ -14,7 +14,7 @@ import "../inventory/inventory.css";
 import { useInventoryStore } from "../inventory/inventoryStore";
 import { useInventoryKeys } from "../inventory/useInventoryKeys";
 import { MOVABLE_PROP_ASSETS } from "./mapData";
-import { BlackjackOverlay } from "./BlackjackOverlay";
+import { type CasinoOverlay, CasinoOverlays } from "./CasinoOverlays";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
 import { FarmMapScene } from "./FarmMapScene";
@@ -25,10 +25,7 @@ import { MarketWindow } from "./MarketWindow";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { MARKETS } from "./marketData";
 import { marketplaceResources } from "./marketplaceResources";
-import { PokerOverlay } from "./PokerOverlay";
-import { RouletteOverlay } from "./RouletteOverlay";
 import { resources } from "./resources";
-import { SlotsOverlay } from "./SlotsOverlay";
 import { useFarmMarket } from "./useFarmMarket";
 import type { WorldArea } from "./WalkingScene";
 
@@ -147,10 +144,7 @@ export default function FarmMap() {
 
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
-	const [blackjackOpen, setBlackjackOpen] = useState(false);
-	const [pokerOpen, setPokerOpen] = useState(false);
-	const [rouletteOpen, setRouletteOpen] = useState(false);
-	const [slotsOpen, setSlotsOpen] = useState(false);
+	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(null);
 	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
@@ -184,25 +178,17 @@ export default function FarmMap() {
 		});
 		marketSceneRef.current = marketplace;
 		engine.addScene("marketplace", marketplace);
+		function openCasino(overlay: CasinoOverlay) {
+			casino.setPaused(true);
+			setCasinoOverlay(overlay);
+		}
 		const casino = new CasinoScene(
 			setTravelPrompt,
 			setArea,
-			() => {
-				casino.setPaused(true);
-				setBlackjackOpen(true);
-			},
-			() => {
-				casino.setPaused(true);
-				setPokerOpen(true);
-			},
-			() => {
-				casino.setPaused(true);
-				setRouletteOpen(true);
-			},
-			() => {
-				casino.setPaused(true);
-				setSlotsOpen(true);
-			},
+			() => openCasino("blackjack"),
+			() => openCasino("poker"),
+			() => openCasino("roulette"),
+			() => openCasino("slots"),
 		);
 		casinoRef.current = casino;
 		engine.addScene("casino", casino);
@@ -266,10 +252,7 @@ export default function FarmMap() {
 
 	function closeCasinoOverlay() {
 		casinoRef.current?.setPaused(false);
-		setBlackjackOpen(false);
-		setPokerOpen(false);
-		setRouletteOpen(false);
-		setSlotsOpen(false);
+		setCasinoOverlay(null);
 	}
 
 	// The farm channel join is what sets `farm`; until it lands, an action would
@@ -337,10 +320,7 @@ export default function FarmMap() {
 			<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
 			<InventoryPanel />
 			{paused && <PauseMenu />}
-			{blackjackOpen && <BlackjackOverlay onClose={closeCasinoOverlay} />}
-			{pokerOpen && <PokerOverlay onClose={closeCasinoOverlay} />}
-			{rouletteOpen && <RouletteOverlay onClose={closeCasinoOverlay} />}
-			{slotsOpen && <SlotsOverlay onClose={closeCasinoOverlay} />}
+			<CasinoOverlays open={casinoOverlay} onClose={closeCasinoOverlay} />
 		</main>
 	);
 }
