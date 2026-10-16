@@ -10,7 +10,7 @@ defmodule Grange.FarmStore do
 
   import Ecto.Query
 
-  alias Grange.{Farm, FarmRecord, Repo, Tile}
+  alias Grange.{Farm, FarmFence, FarmProp, FarmProps, FarmRecord, Repo, Tile}
 
   @lobby_topic "lobby"
 
@@ -34,8 +34,19 @@ defmodule Grange.FarmStore do
   @spec view(String.t()) :: map() | nil
   def view(owner) do
     case Repo.get(FarmRecord, owner) do
-      nil -> nil
-      farm -> %{owner: owner, tiles: tiles(owner), tomatoes: farm.tomatoes}
+      nil ->
+        nil
+
+      farm ->
+        %{
+          owner: owner,
+          tiles: tiles(owner),
+          tomatoes: farm.tomatoes,
+          fences: fences(owner),
+          fence_count: farm.fence_count,
+          prop_overrides: FarmProps.overrides(owner),
+          prop_inventory: FarmProps.inventory(owner)
+        }
     end
   end
 
@@ -50,6 +61,43 @@ defmodule Grange.FarmStore do
     case normalize(action) do
       {:ok, kind, x, y} -> run(owner, kind, x, y)
       :error -> {:error, "invalid action"}
+    end
+  end
+
+  @spec prop_action(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
+  def prop_action(owner, action) when is_map(action) do
+    result = Repo.transaction(fn -> run_prop_action(owner, action) end)
+
+    case result do
+      {:ok, :ok} ->
+        broadcast_change(owner)
+        {:ok, view(owner)}
+
+      {:ok, {:error, reason}} ->
+        {:error, reason}
+
+      {:error, _} ->
+        {:error, "could not update object"}
+    end
+  end
+
+  def prop_action(_owner, _action), do: {:error, "invalid prop action"}
+
+  defp run_prop_action(owner, action) do
+    case fetch(action, "kind") do
+      "dig" ->
+        FarmProps.dig(owner, to_integer(fetch(action, "index")))
+
+      "place" ->
+        FarmProps.place(
+          owner,
+          fetch(action, "asset"),
+          to_integer(fetch(action, "x")),
+          to_integer(fetch(action, "y"))
+        )
+
+      _ ->
+        {:error, "invalid prop action"}
     end
   end
 
@@ -93,12 +141,19 @@ defmodule Grange.FarmStore do
   @spec reset() :: :ok
   def reset do
     Repo.delete_all(Tile)
+    Repo.delete_all(FarmFence)
+    Repo.delete_all(FarmProp)
     Repo.delete_all(FarmRecord)
     :ok
   end
 
   defp run(owner, kind, x, y) do
-    if Farm.in_bounds?(x, y) do
+    bounds? =
+      if kind in [:place_fence, :remove_fence],
+        do: x in 0..17 and y in 0..9,
+        else: Farm.in_bounds?(x, y)
+
+    if bounds? do
       apply_action(owner, kind, x, y)
     else
       {:error, "out of bounds"}
@@ -130,6 +185,39 @@ defmodule Grange.FarmStore do
 
       _tile ->
         {:error, "tile is already tilled"}
+    end
+  end
+
+  defp mutate(owner, :place_fence, x, y) do
+    farm = Repo.get!(FarmRecord, owner)
+
+    cond do
+      farm.fence_count <= 0 ->
+        {:error, "no fences left"}
+
+      fence_at(owner, x, y) ->
+        {:error, "fence already here"}
+
+      tile_at(owner, x, y) ->
+        {:error, "crop tile is in the way"}
+
+      true ->
+        Repo.insert!(%FarmFence{owner: owner, x: x, y: y})
+        Repo.update!(Ecto.Changeset.change(farm, fence_count: farm.fence_count - 1))
+        :ok
+    end
+  end
+
+  defp mutate(owner, :remove_fence, x, y) do
+    case fence_at(owner, x, y) do
+      nil ->
+        {:error, "no fence here"}
+
+      fence ->
+        Repo.delete!(fence)
+        farm = Repo.get!(FarmRecord, owner)
+        Repo.update!(Ecto.Changeset.change(farm, fence_count: farm.fence_count + 1))
+        :ok
     end
   end
 
@@ -178,7 +266,14 @@ defmodule Grange.FarmStore do
     :ok
   end
 
-  @kinds %{"till" => :till, "plant" => :plant, "water" => :water, "harvest" => :harvest}
+  @kinds %{
+    "till" => :till,
+    "plant" => :plant,
+    "water" => :water,
+    "harvest" => :harvest,
+    "place_fence" => :place_fence,
+    "remove_fence" => :remove_fence
+  }
 
   defp normalize(action) when is_map(action) do
     kind = Map.get(@kinds, to_string(fetch(action, "kind")))
@@ -208,6 +303,20 @@ defmodule Grange.FarmStore do
 
   defp tile_at(owner, x, y) do
     Repo.one(from(t in Tile, where: t.owner == ^owner and t.x == ^x and t.y == ^y))
+  end
+
+  defp fence_at(owner, x, y) do
+    Repo.one(from(f in FarmFence, where: f.owner == ^owner and f.x == ^x and f.y == ^y))
+  end
+
+  defp fences(owner) do
+    Repo.all(
+      from(f in FarmFence,
+        where: f.owner == ^owner,
+        order_by: [f.x, f.y],
+        select: %{x: f.x, y: f.y}
+      )
+    )
   end
 
   defp tiles(owner) do

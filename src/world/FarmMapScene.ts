@@ -3,13 +3,13 @@ import type { FarmTileState, FarmToolId } from "../../shared/farm";
 import { isFarmInBounds } from "../../shared/farm";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
-import {
-	countItem,
-	isInventoryBlockingInput,
-	useInventoryStore,
-} from "../inventory/inventoryStore";
-import { BlockRegistry, decorByTile } from "./blocking";
+import { isInventoryBlockingInput } from "../inventory/inventoryStore";
+import { BlockRegistry } from "./blocking";
 import { CropLayer } from "./cropLayer";
+import { FenceLayer } from "./fenceRendering";
+import { actOnFence, selectedFarmItem } from "./fenceActions";
+import { handleFarmPropClick } from "./farmPropActions";
+import { FarmPropLayer } from "./farmPropLayer";
 import { FarmTravel } from "./FarmTravel";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
@@ -22,14 +22,13 @@ import {
 	MAP_HEIGHT,
 	MAP_ROWS,
 	MAP_WIDTH,
-	props,
 	TILE_SIZE,
 	terrainAt,
 } from "./mapData";
 import { updateFarmPlayer } from "./playerMovement";
-import { addFarmProps } from "./propLayer";
+import { actOnPlayerFarmTile, consumeSeedAt } from "./playerFarmAction";
 import { terrainFrames, terrainImage } from "./resources";
-import { clearDecorAt, refreshTile } from "./tileSync";
+import { refreshTile } from "./tileSync";
 import type { WorldArea } from "./WalkingScene";
 
 export class FarmMapScene extends ex.Scene {
@@ -41,12 +40,10 @@ export class FarmMapScene extends ex.Scene {
 	private sheet!: ex.SpriteSheet;
 	private terrain!: ex.TileMap;
 	private readonly crops = new CropLayer(this);
-	// Growable set of tool-blocked tiles, seeded from props below. Future
-	// placeable fences will add/remove entries here at runtime.
+	// Growable tool-blocked tiles, including the live placed-fence layer.
 	private readonly blocks = new BlockRegistry();
-	// Created actors per prop index, so tilled-over decor can be removed.
-	private readonly propActors: Array<ex.Actor | undefined> = [];
-	private readonly decor = decorByTile(props);
+	private readonly fences = new FenceLayer(this, this.blocks);
+	private readonly farmProps = new FarmPropLayer(this, this.blocks);
 
 	// Last server tile states by field key, so only changed map tiles refresh.
 	private readonly synced = new Map<string, FarmTileState>();
@@ -105,8 +102,9 @@ export class FarmMapScene extends ex.Scene {
 		}
 		this.add(this.terrain);
 
-		// 3. Populate Props and register their tool-blocked tiles
-		addFarmProps(this, this.blocks, this.propActors);
+		// 3. Populate saved farm props and their collision/tool footprints.
+		this.farmProps.set(useGameStore.getState().activeFarm?.prop_overrides ?? []);
+		this.fences.set(useGameStore.getState().activeFarm?.fences ?? []);
 
 		// 4. Create Player Actor
 		this.player = new ex.Actor({
@@ -122,8 +120,10 @@ export class FarmMapScene extends ex.Scene {
 		// 5. Tool input: click or drag to act on field tiles via the server
 		const pointers = engine.input.pointers;
 		pointers.primary.on("down", (evt) => {
-			if (this.deactivated) return;
-			this.painting = true;
+			if (this.deactivated || isInventoryBlockingInput()) return;
+			const item = selectedFarmItem();
+			this.painting = item === "hoe" || item === "seed-bag" ||
+				item === "watering-can" || item === "scythe";
 			this.strokeTiles.clear();
 			this.applyToolAt(evt.worldPos);
 		});
@@ -171,8 +171,13 @@ export class FarmMapScene extends ex.Scene {
 
 		this.travel.update(this.player, this.inputManager, engine);
 
-		this.handleToolKeys();
+		if (this.isOwner && this.inputManager.consumePressed("Space")) {
+			actOnPlayerFarmTile(this.owner, this.player.pos.x, this.player.pos.y,
+				(message) => { this.message = message; this.emitHud(); });
+		}
 		this.syncTilesFromServer();
+		this.farmProps.set(useGameStore.getState().activeFarm?.prop_overrides ?? []);
+		this.fences.set(useGameStore.getState().activeFarm?.fences ?? []);
 	}
 
 	override onDeactivate(): void {
@@ -181,48 +186,6 @@ export class FarmMapScene extends ex.Scene {
 		this.painting = false;
 		this.inputManager?.destroy();
 		this.travel.deactivate();
-	}
-
-	private handleToolKeys(): void {
-		// Tool selection lives on the hotbar; this only handles the contextual
-		// action key that acts on the tile the player is standing on.
-		if (this.isOwner && this.inputManager.consumePressed("Space")) {
-			this.actOnPlayerTile();
-		}
-	}
-
-	private actOnPlayerTile(): void {
-		const column = Math.floor(this.player.pos.x / TILE_SIZE);
-		const row = Math.floor(this.player.pos.y / TILE_SIZE);
-		if (!isFarmInBounds(column, row)) return;
-		const tool = useGameStore.getState().tool;
-		if (tool === "seed" && !this.consumeSeedAt(column, row)) return;
-		emitFarmAction(this.owner, {
-			kind: TOOL_KIND[tool],
-			x: column,
-			y: row,
-		});
-	}
-
-	/** Spends one seed to plant at (column, row). Returns false (with a HUD
-	 * message) when the tile is not tilled or the player is out of seeds. */
-	private consumeSeedAt(column: number, row: number): boolean {
-		const tile = useGameStore
-			.getState()
-			.activeFarm?.tiles.find((t) => t.x === column && t.y === row);
-		if (tile?.state !== "tilled") {
-			this.message = "Plant seeds in tilled soil.";
-			this.emitHud();
-			return false;
-		}
-		const inventory = useInventoryStore.getState();
-		if (countItem(inventory, "seed-bag") < 1) {
-			this.message = "Out of seeds — buy more at the market.";
-			this.emitHud();
-			return false;
-		}
-		inventory.removeItem("seed-bag", 1);
-		return true;
 	}
 
 	private applyToolAt(worldPos: ex.Vector): void {
@@ -238,6 +201,23 @@ export class FarmMapScene extends ex.Scene {
 
 		if (!this.isOwner) {
 			this.message = "Visitors can't farm here.";
+			this.emitHud();
+			return;
+		}
+
+		const item = selectedFarmItem();
+		if (handleFarmPropClick(item, worldPos, this.farmProps,
+			useGameStore.getState().activeFarm, this.owner, this.player.pos,
+			(message) => { this.message = message; this.emitHud(); })) return;
+		if (item === "fence" || item === "shovel") {
+			actOnFence(this.owner, column, row, item, this.blocks, this.player.pos, (message) => {
+				this.message = message;
+				this.emitHud();
+			});
+			return;
+		}
+		if (!item) {
+			this.message = "Select a tool or item first.";
 			this.emitHud();
 			return;
 		}
@@ -266,7 +246,8 @@ export class FarmMapScene extends ex.Scene {
 			return;
 		}
 
-		if (tool === "seed" && !this.consumeSeedAt(column, row)) return;
+		if (tool === "seed" && !consumeSeedAt(column, row,
+			(message) => { this.message = message; this.emitHud(); })) return;
 
 		emitFarmAction(this.owner, {
 			kind: TOOL_KIND[tool],
@@ -297,7 +278,6 @@ export class FarmMapScene extends ex.Scene {
 					tile.y,
 					tile.state,
 				);
-				clearDecorAt(this.decor, this.propActors, props, key);
 				changed = true;
 			}
 			if (farm.tomatoes !== this.lastTomatoes) {

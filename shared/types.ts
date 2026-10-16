@@ -17,7 +17,15 @@ export interface ActiveFarm {
 	owner: string;
 	tiles: FarmTile[];
 	tomatoes: number;
+	fences: Array<{ x: number; y: number }>;
+	fence_count: number;
+	prop_overrides: Array<{ index: number; asset: string; x: number; y: number; carried: boolean }>;
+	prop_inventory: Record<string, number>;
 }
+
+export type FarmPropAction =
+	| { kind: "dig"; index: number }
+	| { kind: "place"; asset: string; x: number; y: number };
 
 /** A lightweight view of a farm for lobby listings. */
 export interface FarmSummary {
@@ -31,7 +39,7 @@ export interface FarmSummary {
 
 /** A player's request to act on a tile of their own farm. */
 export type FarmAction = {
-	kind: "till" | "plant" | "water" | "harvest";
+	kind: "till" | "plant" | "water" | "harvest" | "place_fence" | "remove_fence";
 	x: number;
 	y: number;
 };

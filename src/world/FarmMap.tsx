@@ -13,6 +13,7 @@ import { useGameStore } from "../store";
 import "../inventory/inventory.css";
 import { useInventoryStore } from "../inventory/inventoryStore";
 import { useInventoryKeys } from "../inventory/useInventoryKeys";
+import { MOVABLE_PROP_ASSETS } from "./mapData";
 import { BlackjackOverlay } from "./BlackjackOverlay";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
@@ -66,6 +67,7 @@ export default function FarmMap() {
 	const selectedHotbar = useInventoryStore((s) => s.selectedHotbar);
 	const hotbar = useInventoryStore((s) => s.hotbar);
 	const addItem = useInventoryStore((s) => s.addItem);
+	const setItemCount = useInventoryStore((s) => s.setItemCount);
 	const setInventoryOpen = useInventoryStore((s) => s.setInventoryOpen);
 	const pushNotice = useNotificationStore((s) => s.push);
 	const paused = usePauseStore((s) => s.paused);
@@ -108,6 +110,26 @@ export default function FarmMap() {
 		const next = farmToolForItem(hotbar[selectedHotbar]?.itemId ?? null);
 		if (next) setTool(next);
 	}, [hotbar, selectedHotbar, setTool]);
+
+	const heldItem = hotbar[selectedHotbar]?.itemId;
+	useEffect(() => {
+		if (heldItem === "fence") pushNotice("Fence: click clear grass to place a post.", "system");
+		if (heldItem === "shovel") pushNotice("Shovel: click a fence or farm object to dig it up.", "system");
+		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
+			pushNotice(`Click clear ground to place ${heldItem}.`, "system");
+	}, [heldItem, pushNotice]);
+
+	const fenceCount = farm?.fence_count;
+	useEffect(() => {
+		if (fenceCount !== undefined && isOwner) setItemCount("fence", fenceCount);
+	}, [fenceCount, isOwner, setItemCount]);
+
+	const propInventory = farm?.prop_inventory;
+	useEffect(() => {
+		if (!propInventory || !isOwner) return;
+		for (const asset of MOVABLE_PROP_ASSETS)
+			setItemCount(asset, propInventory[asset] ?? 0);
+	}, [propInventory, isOwner, setItemCount]);
 
 	// Harvested tomatoes become physical inventory items. The server keeps its
 	// own barn/lobby total; we mirror the positive delta for the owner into the
