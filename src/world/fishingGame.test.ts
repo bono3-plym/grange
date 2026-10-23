@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { FISH } from "./fishingData";
 import {
-	biteWindowMs,
-	castDelayMs,
+	applyArrow,
+	type ArrowDir,
+	comboLuck,
+	comboLuckGain,
+	COMBO_LENGTH,
+	dirForKey,
 	type FishingBank,
 	fishWeight,
+	newComboProgress,
+	nextSequence,
 	phishingBounty,
 	pickRival,
 	resolveCatch,
@@ -57,15 +63,66 @@ describe("fishing game", () => {
 		}
 	});
 
-	it("keeps the bite delay inside its window", () => {
-		expect(castDelayMs(() => 0)).toBe(700);
-		expect(castDelayMs(() => 0.999)).toBeLessThan(2200);
-		expect(castDelayMs(() => 0.999)).toBeGreaterThanOrEqual(700);
+	it("builds a fresh four-arrow sequence", () => {
+		expect(nextSequence(() => 0)).toEqual(["up", "up", "up", "up"]);
+		expect(nextSequence(() => 0.999)).toEqual(["right", "right", "right", "right"]);
+		expect(nextSequence()).toHaveLength(COMBO_LENGTH);
+		expect(newComboProgress(() => 0)).toEqual({
+			sequence: ["up", "up", "up", "up"],
+			index: 0,
+			combos: 0,
+		});
 	});
 
-	it("gives a luckier rod a slightly longer reel window", () => {
-		expect(biteWindowMs(0)).toBe(1300);
-		expect(biteWindowMs(3)).toBeGreaterThan(biteWindowMs(0));
+	it("maps arrow keys and WASD to the same directions", () => {
+		expect(dirForKey("ArrowUp")).toBe("up");
+		expect(dirForKey("KeyW")).toBe("up");
+		expect(dirForKey("KeyA")).toBe("left");
+		expect(dirForKey("ArrowDown")).toBe("down");
+		expect(dirForKey("KeyD")).toBe("right");
+		expect(dirForKey("Space")).toBeNull();
+	});
+
+	it("scales combo luck with the rod", () => {
+		expect(comboLuckGain(0)).toBeCloseTo(0.2);
+		expect(comboLuckGain(3)).toBeGreaterThan(comboLuckGain(0));
+		expect(comboLuck(0, 3)).toBe(0);
+		expect(comboLuck(2, 1)).toBeCloseTo(2 * 0.35);
+	});
+
+	describe("applyArrow", () => {
+		const sequence: ArrowDir[] = ["up", "right", "down", "left"];
+		const start = { sequence, index: 0, combos: 0 };
+
+		it("walks the sequence forward on a hit without banking a combo", () => {
+			const result = applyArrow(start, "up", () => 0);
+			expect(result.hit).toBe(true);
+			expect(result.completed).toBe(false);
+			expect(result.progress.index).toBe(1);
+			expect(result.progress.combos).toBe(0);
+		});
+
+		it("banks a combo and rolls a new sequence on a full run", () => {
+			let state = start;
+			for (const dir of sequence) {
+				state = applyArrow(state, dir, () => 0).progress;
+			}
+			expect(state.combos).toBe(1);
+			expect(state.index).toBe(0);
+			expect(state.sequence).toEqual(["up", "up", "up", "up"]);
+		});
+
+		it("rewinds on a miss without losing banked combos", () => {
+			let state = start;
+			for (const dir of sequence) {
+				state = applyArrow(state, dir, () => 0).progress;
+			}
+			const missed = applyArrow(state, "left", () => 0);
+			expect(missed.hit).toBe(false);
+			expect(missed.completed).toBe(false);
+			expect(missed.progress.index).toBe(0);
+			expect(missed.progress.combos).toBe(1);
+		});
 	});
 
 	it("keeps the phishing bounty within a tenth of the pool", () => {

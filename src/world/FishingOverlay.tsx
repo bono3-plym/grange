@@ -3,8 +3,6 @@ import { countItem, useInventoryStore } from "../inventory/inventoryStore";
 import { useGameStore } from "../store";
 import { economy } from "./EconomyManager";
 import {
-	FISH,
-	FISH_ORDER,
 	type FishDef,
 	RARITY_LABEL,
 	RODS,
@@ -12,26 +10,46 @@ import {
 	STARTER_ROD,
 } from "./fishingData";
 import {
-	biteWindowMs,
-	castDelayMs,
+	applyArrow,
+	type ArrowDir,
+	comboLuck,
+	comboLuckGain,
+	COMBO_LENGTH,
+	type ComboProgress,
+	dirForKey,
+	newComboProgress,
 	pickRival,
 	resolveCatch,
 	rodLuck,
+	ROUND_MS,
 	rollCatch,
 } from "./fishingGame";
 import { useFishingStore } from "./fishingStore";
+import { FishingGear } from "./FishingGear";
 import { useEconomyBalance } from "./useEconomy";
 import "./fishing.css";
 
-type Phase = "idle" | "casting" | "bite" | "caught" | "escaped";
+type Phase = "idle" | "round" | "caught";
+
+const ARROW_GLYPH: Record<ArrowDir, string> = {
+	up: "↑",
+	down: "↓",
+	left: "←",
+	right: "→",
+};
+
+/** Fixed arrow positions, so each box has a stable (non-index) key. */
+const SLOTS = Array.from({ length: COMBO_LENGTH }, (_, slot) => slot);
 
 interface FishingOverlayProps {
 	onClose: () => void;
 }
 
 /**
- * The pond-side mini-game. Cast, wait for a bite, then reel inside the window
- * before it slips away. The equipped rod's luck biases what bites.
+ * The pond-side mini-game. Cast, then spend ten seconds matching 4-arrow
+ * sequences. Every completed combo banks luck — scaled up by the rod — and a
+ * miss only rewinds the current sequence, never removing banked luck. When the
+ * clock runs out the catch is rolled with base rod luck plus the combo bonus.
  */
 export function FishingOverlay({ onClose }: FishingOverlayProps) {
 	const username = useGameStore((s) => s.username);
@@ -45,12 +63,21 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 	const balance = useEconomyBalance();
 
 	const [phase, setPhase] = useState<Phase>("idle");
-	const [message, setMessage] = useState("Cast your line to start fishing.");
+	const [progress, setProgress] = useState<ComboProgress>(() =>
+		newComboProgress(),
+	);
+	const [timeLeftMs, setTimeLeftMs] = useState(ROUND_MS);
+	const [feedback, setFeedback] = useState<"hit" | "miss" | null>(null);
+	const [message, setMessage] = useState("Cast your line, then match the arrows.");
 	const [caught, setCaught] = useState<FishDef | null>(null);
 
-	const timers = useRef<number[]>([]);
-	const awaiting = useRef(false);
-	// Rods live in the inventory; the fishing store only remembers the pick.
+	const timeouts = useRef<number[]>([]);
+	const intervals = useRef<number[]>([]);
+	const startedAt = useRef(0);
+	const progressRef = useRef(progress);
+	const rodRef = useRef(equippedId);
+	rodRef.current = equippedId;
+
 	const ownedRods = useMemo(
 		() => ROD_ORDER.filter((id) => countItem({ grid, hotbar }, id) > 0),
 		[grid, hotbar],
@@ -60,13 +87,23 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 		: STARTER_ROD;
 	const luck = rodLuck(equippedRod);
 	const rod = RODS[equippedRod];
+	const combos = progress.combos;
+	const comboBonus = comboLuck(combos, luck);
+	const totalLuck = luck + comboBonus;
 
 	const clearTimers = useCallback(() => {
-		for (const id of timers.current) window.clearTimeout(id);
-		timers.current = [];
+		for (const id of timeouts.current) window.clearTimeout(id);
+		for (const id of intervals.current) window.clearInterval(id);
+		timeouts.current = [];
+		intervals.current = [];
 	}, []);
 
 	useEffect(() => clearTimers, [clearTimers]);
+
+	const commitProgress = useCallback((next: ComboProgress) => {
+		progressRef.current = next;
+		setProgress(next);
+	}, []);
 
 	const bank = useMemo(
 		() => ({
@@ -78,34 +115,13 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 		[],
 	);
 
-	const cast = useCallback(() => {
+	const finish = useCallback(() => {
 		clearTimers();
-		awaiting.current = false;
-		setCaught(null);
-		setPhase("casting");
-		setMessage("You cast the line and watch the bobber…");
-		timers.current.push(
-			window.setTimeout(() => {
-				awaiting.current = true;
-				setPhase("bite");
-				setMessage("Something's tugging — reel it in!");
-				timers.current.push(
-					window.setTimeout(() => {
-						if (!awaiting.current) return;
-						awaiting.current = false;
-						setPhase("escaped");
-						setMessage("It slipped off the hook. Cast again.");
-					}, biteWindowMs(luck)),
-				);
-			}, castDelayMs()),
-		);
-	}, [clearTimers, luck]);
-
-	const reel = useCallback(() => {
-		if (!awaiting.current) return;
-		awaiting.current = false;
-		clearTimers();
-		const landed = rollCatch(luck);
+		const rodId = rodRef.current;
+		const base = rodLuck(rodId);
+		const banked = progressRef.current.combos;
+		const total = base + comboLuck(banked, base);
+		const landed = rollCatch(total);
 		const rival = pickRival(
 			username,
 			players.map((player) => player.name),
@@ -114,8 +130,43 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 		addFish(landed.id, 1);
 		setCaught(landed);
 		setPhase("caught");
-		setMessage(result.message);
-	}, [addFish, bank, clearTimers, luck, players, username]);
+		setMessage(
+			`${result.message} (${banked} combo${banked === 1 ? "" : "s"}, luck ${total.toFixed(2)})`,
+		);
+	}, [addFish, bank, clearTimers, players, username]);
+
+	const cast = useCallback(() => {
+		clearTimers();
+		setCaught(null);
+		setFeedback(null);
+		commitProgress(newComboProgress());
+		setTimeLeftMs(ROUND_MS);
+		setPhase("round");
+		setMessage("Match the arrow sequence!");
+		startedAt.current = Date.now();
+		intervals.current.push(
+			window.setInterval(() => {
+				setTimeLeftMs(Math.max(0, ROUND_MS - (Date.now() - startedAt.current)));
+			}, 100),
+		);
+		timeouts.current.push(window.setTimeout(finish, ROUND_MS));
+	}, [clearTimers, commitProgress, finish]);
+
+	const press = useCallback(
+		(dir: ArrowDir) => {
+			const result = applyArrow(progressRef.current, dir);
+			commitProgress(result.progress);
+			setFeedback(result.hit ? "hit" : "miss");
+			if (result.completed) {
+				const gain = comboLuckGain(rodLuck(rodRef.current));
+				setMessage(`Combo! +${gain.toFixed(2)} luck.`);
+			}
+			timeouts.current.push(
+				window.setTimeout(() => setFeedback(null), 220),
+			);
+		},
+		[commitProgress],
+	);
 
 	useEffect(() => {
 		function onKeyDown(event: KeyboardEvent) {
@@ -127,18 +178,24 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 				onClose();
 				return;
 			}
+			if (phase === "round") {
+				const dir = dirForKey(event.code);
+				if (dir) {
+					event.preventDefault();
+					press(dir);
+				}
+				return;
+			}
 			if (event.code === "Space" || event.code === "Enter") {
 				event.preventDefault();
-				if (phase === "bite") reel();
-				else if (phase !== "casting") cast();
+				cast();
 			}
 		}
 		window.addEventListener("keydown", onKeyDown, true);
 		return () => window.removeEventListener("keydown", onKeyDown, true);
-	}, [cast, clearTimers, onClose, phase, reel]);
+	}, [cast, clearTimers, onClose, phase, press]);
 
-	const held = FISH_ORDER.filter((id) => (fish[id] ?? 0) > 0);
-
+	const timePct = Math.round((timeLeftMs / ROUND_MS) * 100);
 	return (
 		<div
 			className="fish-overlay"
@@ -152,7 +209,7 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 						${balance.toLocaleString()}
 					</span>
 					<span className="fish-luck" data-testid="fishing-luck">
-						{rod.name} · Luck {luck}
+						{rod.name} · Luck {totalLuck.toFixed(2)}
 					</span>
 					<button
 						type="button"
@@ -170,7 +227,7 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 				>
 					<img className="fish-rod-icon" src={rod.icon} alt="" />
 					<span className="fish-bobber" aria-hidden="true">
-						{phase === "bite" ? "❗" : "🎣"}
+						{phase === "round" ? "❗" : "🎣"}
 					</span>
 					{caught && (
 						<span className="fish-catch" data-testid="fishing-catch">
@@ -183,77 +240,70 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 					)}
 				</div>
 
+				{phase === "round" && (
+					<>
+						<div className="fish-timer" data-testid="fishing-timer">
+							<div className="fish-timer-fill" style={{ width: `${timePct}%` }} />
+						</div>
+						<div
+							className={
+								feedback === "miss"
+									? "fish-sequence fish-sequence-miss"
+									: "fish-sequence"
+							}
+							data-testid="fishing-sequence"
+						>
+							{SLOTS.map((slot) => (
+								<span
+									key={slot}
+									className={
+										slot < progress.index
+											? "fish-arrow fish-arrow-done"
+											: slot === progress.index
+												? "fish-arrow fish-arrow-current"
+												: "fish-arrow"
+									}
+								>
+									{ARROW_GLYPH[progress.sequence[slot]]}
+								</span>
+							))}
+						</div>
+					</>
+				)}
+
 				<p className="fish-message" data-testid="fishing-message">
 					{message}
 				</p>
+
+				<div className="fish-stats" data-testid="fishing-stats">
+					<span>Combos: {combos}</span>
+					<span>Combo luck: +{comboBonus.toFixed(2)}</span>
+					<span>Total luck: {totalLuck.toFixed(2)}</span>
+				</div>
 
 				<div className="fish-actions">
 					<button
 						type="button"
 						className="fish-action fish-primary"
 						data-testid="fishing-cast"
-						disabled={phase === "casting" || phase === "bite"}
+						disabled={phase === "round"}
 						onClick={cast}
 					>
-						{phase === "casting" ? "Waiting…" : "Cast line"}
-					</button>
-					<button
-						type="button"
-						className={
-							phase === "bite" ? "fish-action fish-reel-active" : "fish-action"
-						}
-						data-testid="fishing-reel"
-						disabled={phase !== "bite"}
-						onClick={reel}
-					>
-						Reel in!
+						{phase === "round" ? "Fishing…" : "Cast line"}
 					</button>
 				</div>
 
-				<details className="fish-rods" data-testid="fishing-rods">
-					<summary>Rods</summary>
-					<ul>
-						{ownedRods.map((id) => (
-							<li key={id}>
-								<button
-									type="button"
-									className={
-										id === equippedRod ? "fish-rod fish-rod-active" : "fish-rod"
-									}
-									data-testid={`fishing-rod-${id}`}
-									aria-pressed={id === equippedRod}
-									onClick={() => equipRod(id)}
-								>
-									{RODS[id].name} · Luck {RODS[id].luck}
-								</button>
-							</li>
-						))}
-					</ul>
-					<p className="fish-hint">
-						Buy better rods at the produce market's Rods tab.
-					</p>
-				</details>
+				<p className="fish-hint">
+					Use arrow keys or WASD to match each 4-arrow sequence. A miss only
+					rewinds the current sequence — banked luck is kept.
+				</p>
 
-				<section className="fish-creel" data-testid="fishing-creel">
-					<h3 className="fish-creel-title">Creel</h3>
-					{held.length === 0 ? (
-						<p className="fish-hint">Nothing yet — go catch something.</p>
-					) : (
-						<ul className="fish-creel-list">
-							{held.map((id) => (
-								<li key={id} data-testid={`fishing-held-${id}`}>
-									<span>
-										{FISH[id].emoji} {FISH[id].name}
-									</span>
-									<span>×{fish[id]}</span>
-								</li>
-							))}
-						</ul>
-					)}
-					<p className="fish-hint">
-						Sell your catch on the produce market's Fish tab.
-					</p>
-				</section>
+				<FishingGear
+					ownedRods={ownedRods}
+					equippedRod={equippedRod}
+					onEquip={equipRod}
+					fish={fish}
+				/>
 			</div>
 		</div>
 	);
