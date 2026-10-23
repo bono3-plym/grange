@@ -20,6 +20,7 @@ describe("inventory slots", () => {
 		expect(grid.every((slot) => slot.itemId === null)).toBe(true);
 		expect(hotbar[5]).toMatchObject({ itemId: "fence", count: 20 });
 		expect(hotbar[6]).toMatchObject({ itemId: "shovel", count: 1 });
+		expect(hotbar[7]).toMatchObject({ itemId: "bamboo", count: 1 });
 	});
 
 	it("syncs server fence stock without losing the selected fence slot", () => {

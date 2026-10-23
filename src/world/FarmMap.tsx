@@ -19,6 +19,7 @@ import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
 import { ComboCounter } from "./ComboCounter";
 import { FarmMapScene } from "./FarmMapScene";
+import { FishingOverlay } from "./FishingOverlay";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
 import { MarketplaceScene } from "./MarketplaceScene";
@@ -139,6 +140,7 @@ export default function FarmMap() {
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
 	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(null);
+	const [fishingOpen, setFishingOpen] = useState(false);
 	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
@@ -157,7 +159,10 @@ export default function FarmMap() {
 			backgroundColor: ex.Color.fromHex("#79a44d"),
 		});
 
-		const scene = new FarmMapScene(target, isOwner, setTravelPrompt, setArea);
+		const scene = new FarmMapScene(target, isOwner, setTravelPrompt, setArea, () => {
+			scene.setOverlayPaused(true);
+			setFishingOpen(true);
+		});
 		scene.onFarmUpdate = (snapshot) => {
 			if (cancelled) return;
 			setHud(snapshot);
@@ -236,6 +241,7 @@ export default function FarmMap() {
 		return () => {
 			setPaused(false);
 			setInventoryOpen(false);
+			setFishingOpen(false);
 		};
 	}, [setPaused, setInventoryOpen]);
 
@@ -247,6 +253,11 @@ export default function FarmMap() {
 	function closeCasinoOverlay() {
 		casinoRef.current?.setPaused(false);
 		setCasinoOverlay(null);
+	}
+
+	function closeFishing() {
+		sceneRef.current?.setOverlayPaused(false);
+		setFishingOpen(false);
 	}
 
 	// The farm channel join is what sets `farm`; until it lands, an action would
@@ -315,6 +326,7 @@ export default function FarmMap() {
 			<ComboCounter />
 			<InventoryPanel />
 			{paused && <PauseMenu />}
+			{fishingOpen && <FishingOverlay onClose={closeFishing} />}
 			<CasinoOverlays open={casinoOverlay} onClose={closeCasinoOverlay} />
 		</main>
 	);

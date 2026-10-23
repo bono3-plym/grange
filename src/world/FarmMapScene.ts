@@ -12,6 +12,7 @@ import { performFarmAction } from "./farmActionRunner";
 import { handleFarmPropClick } from "./farmPropActions";
 import { FarmPropLayer } from "./farmPropLayer";
 import { FarmTravel } from "./FarmTravel";
+import { FarmFishing } from "./farmFishing";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
 import { TOOL_HINTS } from "./farmTools";
@@ -57,6 +58,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private lastWorldPos: ex.Vector | null = null;
 	private deactivated = false;
 	private readonly travel: FarmTravel;
+	private readonly fishing: FarmFishing;
 	private train!: TrainController;
 
 	constructor(
@@ -64,9 +66,18 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		private readonly isOwner: boolean,
 		onPromptChange: (prompt: string | null) => void,
 		onAreaChange: (area: WorldArea) => void,
+		onFish: () => void,
 	) {
 		super();
-		this.travel = new FarmTravel(onPromptChange, onAreaChange);
+		this.fishing = new FarmFishing(
+			isOwner,
+			onFish,
+			(prompt) => onPromptChange(prompt),
+		);
+		this.travel = new FarmTravel(
+			(prompt) => this.fishing.setTravelPrompt(prompt),
+			onAreaChange,
+		);
 	}
 
 	override onInitialize(engine: ex.Engine): void {
@@ -176,8 +187,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.fences.set(useGameStore.getState().activeFarm?.fences ?? []);
 
 		// Freeze and hide the player while the inventory modal captures input,
-		// or while the train carries them in or out.
-		if (isInventoryBlockingInput() || !this.train.isParked()) {
+		// while the fishing overlay is open, or while the train carries them.
+		if (
+			isInventoryBlockingInput() ||
+			this.fishing.isPaused ||
+			!this.train.isParked()
+		) {
 			this.player.vel = ex.vec(0, 0);
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
 			return;
@@ -188,12 +203,25 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		updateFarmerGraphics(this.player, dir);
 
 		this.travel.update(this.player, this.inputManager, engine, this.train);
+		this.fishing.update(this.player.pos.y, this.inputManager);
 
 		this.handleToolKeys();
 		this.syncTilesFromServer();
 		this.tileSync.syncGrowing(useGameStore.getState().activeFarm, Date.now());
 		this.sweepFx.update(delta);
 		this.combo.update();
+	}
+
+	/** Freezes the scene while the fishing overlay is open. */
+	setOverlayPaused(paused: boolean): void {
+		this.fishing.setPaused(paused);
+		// Drop keys pressed while the overlay had the keyboard so a held F
+		// cannot reopen the overlay the moment control returns.
+		this.inputManager?.clearPressed();
+		if (paused) {
+			this.player.vel = ex.vec(0, 0);
+			updateFarmerGraphics(this.player, { x: 0, y: 0 });
+		}
 	}
 
 	override onDeactivate(): void {

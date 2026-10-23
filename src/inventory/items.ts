@@ -1,5 +1,6 @@
 import type { CropId } from "../../shared/crops";
 import type { FarmToolId } from "../../shared/farm";
+import { RODS, ROD_ORDER, type RodId } from "../world/fishingData";
 import type { MovablePropKey } from "../world/mapData";
 
 export type ItemId =
@@ -20,6 +21,7 @@ export type ItemId =
 	| "sunburst-tomato-seed"
 	| "fence"
 	| "shovel"
+	| RodId
 	| MovablePropKey;
 
 export type ItemKind = "tool" | "seed" | "crop" | "building";
@@ -34,7 +36,22 @@ export interface ItemDef {
 	description: string;
 }
 
+/** Fishing rods are single-stack tools; their icon and blurb come from RODS. */
+function rodItem(id: RodId): ItemDef {
+	return {
+		id,
+		name: RODS[id].name,
+		kind: "tool",
+		maxStack: 1,
+		icon: RODS[id].icon,
+		description: RODS[id].blurb,
+	};
+}
+
 export const ITEMS: Record<ItemId, ItemDef> = {
+	...(Object.fromEntries(
+		ROD_ORDER.map((id) => [id, rodItem(id)]),
+	) as Record<RodId, ItemDef>),
 	hoe: {
 		id: "hoe",
 		name: "Hoe",

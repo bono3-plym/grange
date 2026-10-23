@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { usePauseStore } from "../pause/pauseStore";
+import { STARTER_ROD } from "../world/fishingData";
 import { ITEMS, type ItemId } from "./items";
 
 export const GRID_SIZE = 24;
@@ -37,6 +38,7 @@ function buildInitialHotbar(): InventorySlot[] {
 	hotbar[3] = stack("scythe", 1);
 	hotbar[5] = stack("fence", 20);
 	hotbar[6] = stack("shovel", 1);
+	hotbar[7] = stack(STARTER_ROD, 1);
 	return hotbar;
 }
 
