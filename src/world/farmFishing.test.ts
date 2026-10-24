@@ -38,16 +38,16 @@ describe("FarmFishing", () => {
 		const { fishing, prompts, input } = setup();
 		fishing.update(SHORE, input);
 		fishing.update(SHORE, fakeInput());
-		expect(prompts).toEqual(["Press F to fish"]);
+		expect(prompts).toEqual(["Press E to fish"]);
 	});
 
 	it("lets the train prompt win over fishing", () => {
 		const { fishing, prompts, input } = setup();
 		fishing.update(SHORE, input);
 		fishing.setTravelPrompt("Press E to travel");
-		expect(prompts).toEqual(["Press F to fish", "Press E to travel"]);
+		expect(prompts).toEqual(["Press E to fish", "Press E to travel"]);
 		fishing.setTravelPrompt(null);
-		expect(prompts[prompts.length - 1]).toBe("Press F to fish");
+		expect(prompts[prompts.length - 1]).toBe("Press E to fish");
 	});
 
 	it("clears the prompt when walking away", () => {
@@ -63,7 +63,7 @@ describe("FarmFishing", () => {
 		expect(onOpen).toHaveBeenCalledTimes(1);
 	});
 
-	it("drains F pressed away from the water instead of opening later", () => {
+	it("drains E pressed away from the water instead of opening later", () => {
 		const { fishing, onOpen } = setup(true, true);
 		fishing.update(FIELD, fakeInput());
 		fishing.update(SHORE, fakeInput());

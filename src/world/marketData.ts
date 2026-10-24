@@ -98,7 +98,7 @@ function rodItem(id: RodId): MarketItem {
 		kind: "buy",
 		price: rod.cost,
 		quantity: 1,
-		blurb: rod.blurb,
+		blurb: `$${rod.cost.toLocaleString()} · ${rod.blurb}`,
 	};
 }
 

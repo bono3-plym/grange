@@ -2,9 +2,9 @@ import type { InputManager } from "./InputManager";
 import { isNearWater } from "./mapData";
 
 /**
- * Offers shoreline fishing on the farm. Owns the "Press F to fish" prompt,
+ * Offers shoreline fishing on the farm. Owns the "Press E to fish" prompt,
  * arbitrating it against the train travel prompt, opens the fishing overlay on
- * a fresh F press, and remembers whether the overlay has paused the scene.
+ * a fresh E press, and remembers whether the overlay has paused the scene.
  * Kept separate from FarmMapScene so that class stays within the file budget.
  */
 export class FarmFishing {
@@ -30,7 +30,7 @@ export class FarmFishing {
 		this.flush();
 	}
 
-	/** Called each frame after travel; opens fishing on a fresh F press. */
+	/** Called each frame after travel; opens fishing on a fresh E press. */
 	update(y: number, input: InputManager): void {
 		const near = this.isOwner && isNearWater(y);
 		if (near !== this.ready) {
@@ -39,7 +39,7 @@ export class FarmFishing {
 		}
 		// Always drain the key so a press made away from the water cannot
 		// linger and fire the moment the player reaches the shore.
-		const pressed = input.consumePressed("KeyF");
+		const pressed = input.consumePressed("KeyE");
 		if (near && pressed) this.onOpen();
 	}
 
@@ -53,7 +53,7 @@ export class FarmFishing {
 	}
 
 	private flush(): void {
-		const next = this.travel ?? (this.ready ? "Press F to fish" : null);
+		const next = this.travel ?? (this.ready ? "Press E to fish" : null);
 		if (next === this.published) return;
 		this.published = next;
 		this.publish(next);
