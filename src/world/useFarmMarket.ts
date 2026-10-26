@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { countItem, useInventoryStore } from "../inventory/inventoryStore";
 import type { ItemId } from "../inventory/items";
-import { emitSellProduce } from "../socket";
+import { emitAddItem, emitRemoveItem, emitSellProduce } from "../socket";
 import { useGameStore } from "../store";
 import { economy } from "./EconomyManager";
 import { type FishId, isFishId, isRodId, RODS } from "./fishingData";
@@ -19,16 +19,15 @@ const SEED_ITEMS: Record<string, ItemId> = {
 
 /**
  * Market overlay state and controls for a farm visit. Seeds and produce follow
- * the crop registry and barn; fish sell from the client-side creel and rods
+ * the crop registry and barn; fish sell straight out of the inventory and rods
  * upgrade the inventory's rod tools.
  */
 export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 	const farm = useGameStore((s) => s.activeFarm);
 	const addItem = useInventoryStore((s) => s.addItem);
+	const removeItem = useInventoryStore((s) => s.removeItem);
 	const grid = useInventoryStore((s) => s.grid);
 	const hotbar = useInventoryStore((s) => s.hotbar);
-	const fish = useFishingStore((s) => s.fish);
-	const sellFish = useFishingStore((s) => s.sellFish);
 	const equipRod = useFishingStore((s) => s.equipRod);
 	const equippedRod = useFishingStore((s) => s.equippedRod);
 	const balance = useEconomyBalance();
@@ -86,6 +85,7 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 			return;
 		}
 		addItem(id, 1);
+		emitAddItem(id, 1);
 		if (RODS[id].luck > RODS[equippedRod].luck) {
 			equipRod(id);
 			setMarketMessage(`Bought the ${item.name} — it's now equipped.`);
@@ -97,12 +97,13 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 	function sellCatch(id: FishId, quantity: number) {
 		if (!isOwner || quantity < 1) return;
 		const item = MARKET_ITEMS[id];
-		const sold = sellFish(id, quantity);
+		const sold = removeItem(id, quantity);
 		if (sold < 1) {
-			setMarketMessage("Your creel is empty.");
+			setMarketMessage(`You have no ${item.name} to sell.`);
 			return;
 		}
 		economy.sell(item.price * sold);
+		emitRemoveItem(id, sold);
 		setMarketMessage(`Sold ${sold} ${item.name} for $${item.price * sold}.`);
 	}
 
@@ -122,7 +123,7 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 			}
 			if (isFishId(item.id)) {
 				const fishId = item.id;
-				const owned = fish[fishId] ?? 0;
+				const owned = countItem(inventory, fishId);
 				return [
 					fishId,
 					{

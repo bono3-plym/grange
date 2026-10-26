@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { countItem, useInventoryStore } from "../inventory/inventoryStore";
+import { emitAddItem } from "../socket";
 import { useGameStore } from "../store";
 import { economy } from "./EconomyManager";
 import {
@@ -54,12 +55,11 @@ interface FishingOverlayProps {
 export function FishingOverlay({ onClose }: FishingOverlayProps) {
 	const username = useGameStore((s) => s.username);
 	const players = useGameStore((s) => s.players);
-	const fish = useFishingStore((s) => s.fish);
 	const equippedId = useFishingStore((s) => s.equippedRod);
-	const addFish = useFishingStore((s) => s.addFish);
 	const equipRod = useFishingStore((s) => s.equipRod);
 	const grid = useInventoryStore((s) => s.grid);
 	const hotbar = useInventoryStore((s) => s.hotbar);
+	const addItem = useInventoryStore((s) => s.addItem);
 	const balance = useEconomyBalance();
 
 	const [phase, setPhase] = useState<Phase>("idle");
@@ -85,6 +85,21 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 	const equippedRod = ownedRods.includes(equippedId)
 		? equippedId
 		: STARTER_ROD;
+
+	// Hand the player their best rod when the pond opens. Rods bought at the
+	// market are restored from the server as inventory items, so without this a
+	// reload would leave a fresh master rod sitting unused in the bag.
+	const handedBest = useRef(false);
+	useEffect(() => {
+		if (handedBest.current || ownedRods.length === 0) return;
+		handedBest.current = true;
+		const best = ownedRods.reduce(
+			(bestId, id) => (RODS[id].luck > RODS[bestId].luck ? id : bestId),
+			STARTER_ROD,
+		);
+		if (best !== equippedId) equipRod(best);
+	}, [ownedRods, equippedId, equipRod]);
+
 	const luck = rodLuck(equippedRod);
 	const rod = RODS[equippedRod];
 	const combos = progress.combos;
@@ -127,13 +142,17 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 			players.map((player) => player.name),
 		);
 		const result = resolveCatch(landed, bank, rival);
-		addFish(landed.id, 1);
+		const leftover = addItem(landed.id, 1);
+		if (leftover === 0) emitAddItem(landed.id, 1);
 		setCaught(landed);
 		setPhase("caught");
+		const stats = `${banked} combo${banked === 1 ? "" : "s"}, luck ${total.toFixed(2)}`;
 		setMessage(
-			`${result.message} (${banked} combo${banked === 1 ? "" : "s"}, luck ${total.toFixed(2)})`,
+			leftover > 0
+				? `${result.message} Your inventory is full, so it slipped back into the pond. (${stats})`
+				: `${result.message} (${stats})`,
 		);
-	}, [addFish, bank, clearTimers, players, username]);
+	}, [addItem, bank, clearTimers, players, username]);
 
 	const cast = useCallback(() => {
 		clearTimers();
@@ -302,7 +321,8 @@ export function FishingOverlay({ onClose }: FishingOverlayProps) {
 					ownedRods={ownedRods}
 					equippedRod={equippedRod}
 					onEquip={equipRod}
-					fish={fish}
+					grid={grid}
+					hotbar={hotbar}
 				/>
 			</div>
 		</div>

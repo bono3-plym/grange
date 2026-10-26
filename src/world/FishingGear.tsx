@@ -1,20 +1,15 @@
-import {
-	FISH,
-	FISH_ORDER,
-	RODS,
-	ROD_ORDER,
-	type RodId,
-} from "./fishingData";
+import { countItem, type InventorySlot } from "../inventory/inventoryStore";
+import { FISH, FISH_ORDER, RODS, ROD_ORDER, type RodId } from "./fishingData";
 import { comboLuckGain } from "./fishingGame";
-import type { FishCounts } from "./fishingStore";
 
 interface FishingGearProps {
 	/** Rods currently held in the inventory, in price order. */
 	ownedRods: RodId[];
 	equippedRod: RodId;
 	onEquip: (id: RodId) => void;
-	/** The creel: fish held by id. */
-	fish: FishCounts;
+	/** The player's inventory; the creel is just the fish stacks in it. */
+	grid: InventorySlot[];
+	hotbar: InventorySlot[];
 }
 
 /** The rods picker and creel list shown in the fishing overlay. */
@@ -22,9 +17,11 @@ export function FishingGear({
 	ownedRods,
 	equippedRod,
 	onEquip,
-	fish,
+	grid,
+	hotbar,
 }: FishingGearProps) {
-	const held = FISH_ORDER.filter((id) => (fish[id] ?? 0) > 0);
+	const inventory = { grid, hotbar };
+	const held = FISH_ORDER.filter((id) => countItem(inventory, id) > 0);
 
 	return (
 		<>
@@ -64,13 +61,14 @@ export function FishingGear({
 								<span>
 									{FISH[id].emoji} {FISH[id].name}
 								</span>
-								<span>×{fish[id]}</span>
+								<span>×{countItem(inventory, id)}</span>
 							</li>
 						))}
 					</ul>
 				)}
 				<p className="fish-hint">
-					Sell your catch on the produce market's Fish tab.
+					Your catch is kept in your inventory. Sell it on the produce market's
+					Fish tab.
 				</p>
 			</section>
 		</>

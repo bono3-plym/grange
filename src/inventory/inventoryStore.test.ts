@@ -104,6 +104,16 @@ describe("inventory slots", () => {
 		expect(useInventoryStore.getState().hotbar[1]?.itemId).toBeNull();
 	});
 
+	it("holds caught fish as stackable items and sells them away", () => {
+		const store = useInventoryStore.getState();
+		expect(store.addItem("minnow", 2)).toBe(0);
+		expect(store.addItem("minnow", 3)).toBe(0);
+		expect(countItem(useInventoryStore.getState(), "minnow")).toBe(5);
+
+		expect(store.removeItem("minnow", 4)).toBe(4);
+		expect(countItem(useInventoryStore.getState(), "minnow")).toBe(1);
+	});
+
 	it("selects hotbar slots and toggles the panel", () => {
 		const store = useInventoryStore.getState();
 		store.selectHotbar(9);

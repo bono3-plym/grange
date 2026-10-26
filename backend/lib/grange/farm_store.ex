@@ -25,6 +25,7 @@ defmodule Grange.FarmStore do
     FarmProp,
     FarmProps,
     FarmRecord,
+    PlayerItem,
     Repo,
     Tile
   }
@@ -132,6 +133,7 @@ defmodule Grange.FarmStore do
   def reset do
     Repo.delete_all(Tile)
     Repo.delete_all(BarnItem)
+    Repo.delete_all(PlayerItem)
     Repo.delete_all(FarmFence)
     Repo.delete_all(FarmProp)
     Repo.delete_all(FarmRecord)
