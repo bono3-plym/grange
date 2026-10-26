@@ -20,6 +20,8 @@ function farmWithTile(state: ActiveFarm["tiles"][number]["state"]): ActiveFarm {
 		barn: {},
 		fences: [],
 		fence_count: 0,
+		gates: [],
+		gate_count: 0,
 		prop_overrides: [],
 		prop_inventory: {},
 	};
