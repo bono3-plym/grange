@@ -18,18 +18,25 @@ describe("inventory slots", () => {
 		expect(countItem(useInventoryStore.getState(), "seed-bag")).toBe(10);
 		expect(countItem(useInventoryStore.getState(), "tomato")).toBe(0);
 		expect(grid.every((slot) => slot.itemId === null)).toBe(true);
+		expect(hotbar[4]).toMatchObject({ itemId: "gate", count: 2 });
 		expect(hotbar[5]).toMatchObject({ itemId: "fence", count: 20 });
 		expect(hotbar[6]).toMatchObject({ itemId: "shovel", count: 1 });
 		expect(hotbar[7]).toMatchObject({ itemId: "bamboo", count: 1 });
 	});
 
-	it("syncs server fence stock without losing the selected fence slot", () => {
+	it("syncs server fence and gate stock without losing their slots", () => {
 		const store = useInventoryStore.getState();
 		store.selectHotbar(5);
 		store.setItemCount("fence", 0);
 		expect(useInventoryStore.getState().hotbar[5]).toMatchObject({ itemId: "fence", count: 0 });
 		store.setItemCount("fence", 19);
 		expect(countItem(useInventoryStore.getState(), "fence")).toBe(19);
+
+		store.selectHotbar(4);
+		store.setItemCount("gate", 0);
+		expect(useInventoryStore.getState().hotbar[4]).toMatchObject({ itemId: "gate", count: 0 });
+		store.setItemCount("gate", 1);
+		expect(countItem(useInventoryStore.getState(), "gate")).toBe(1);
 	});
 
 	it("grants every item at max stack for admins", () => {

@@ -1,5 +1,12 @@
 import { type Channel, Socket } from "phoenix";
-import type { ActiveFarm, FarmAction, FarmPropAction, FarmSummary, Player } from "../shared/types";
+import type {
+	ActiveFarm,
+	FarmAction,
+	FarmGateAction,
+	FarmPropAction,
+	FarmSummary,
+	Player,
+} from "../shared/types";
 import { countItem, useInventoryStore } from "./inventory/inventoryStore";
 import { reconcileServerItems } from "./inventory/itemSync";
 import type { ItemId } from "./inventory/items";
@@ -172,6 +179,26 @@ export function emitFarmAction(
 		.receive("ok", () => cb?.({ ok: true }))
 		.receive("error", (payload: unknown) =>
 			cb?.({ ok: false, error: reasonOf(payload) ?? "Invalid action" }),
+		)
+		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
+}
+
+/** Open/close a gate. Unlike farm actions, visitors may call this. */
+export function emitGateAction(
+	owner: string,
+	action: FarmGateAction,
+	cb?: (res: Ack) => void,
+): void {
+	const channel = farmChannel;
+	if (!channel || farmOwner !== owner) {
+		cb?.({ ok: false, error: "not visiting farm" });
+		return;
+	}
+	channel
+		.push("gateAction", { action })
+		.receive("ok", () => cb?.({ ok: true }))
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not move gate" }),
 		)
 		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }

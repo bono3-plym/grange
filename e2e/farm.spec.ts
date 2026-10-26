@@ -50,8 +50,8 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	});
 	await page.keyboard.press("4");
 	await clickFarmTile(page, 9, 7);
-	// The harvested tomato lands in the first free inventory slot (hotbar 5).
-	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute(
+	// The harvested tomato lands in the first free inventory slot after the tools.
+	await expect(page.locator('[data-item="tomato"]')).toHaveAttribute(
 		"data-count",
 		"1",
 	);
@@ -121,6 +121,26 @@ test("a fence places, blocks hoeing, and returns to inventory when shoveled", as
 	await page.keyboard.press("1");
 	await clickFarmTile(page, 7, 5);
 	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): tilled");
+});
+
+test("a gate places, opens with E, and returns to inventory when shoveled", async ({ page }) => {
+	await resetServer();
+	await register(page, uniqueName("Gater"));
+	await expect(page).toHaveURL(/\/world$/);
+	await expect(page.getByTestId("notification-feed")).toBeVisible();
+
+	await page.keyboard.press("5");
+	await clickFarmTile(page, 8, 8);
+	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute("data-count", "1");
+
+	// The player spawns within reach of this gate, so its prompt appears at once.
+	await expect(page.getByTestId("travel-prompt")).toContainText("open gate");
+	await page.keyboard.press("e");
+	await expect(page.getByTestId("travel-prompt")).toContainText("close gate");
+
+	await page.keyboard.press("7");
+	await clickFarmTile(page, 8, 8);
+	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute("data-count", "2");
 });
 
 test("the shovel moves a well and sign through inventory", async ({ page }) => {
@@ -201,10 +221,13 @@ test("selecting a hotbar slot highlights it", async ({ page }) => {
 	);
 });
 
-test("a visitor sees another farm read-only", async ({ page }) => {
+test("a visitor sees another farm read-only but can toggle its gates", async ({ page }) => {
 	await resetServer();
 	const owner = uniqueName("Owner");
 	await register(page, owner);
+	await page.keyboard.press("5");
+	await clickFarmTile(page, 8, 8);
+	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute("data-count", "1");
 	await page.keyboard.press("Escape");
 	await page.getByTestId("logout").click();
 	await page.waitForURL("**/");
@@ -214,6 +237,16 @@ test("a visitor sees another farm read-only", async ({ page }) => {
 
 	await expect(page.locator("canvas[aria-label^='Farm map']")).toBeVisible();
 	await expect(page.getByTestId("notification-feed")).toContainText("Visiting");
+	await expect(page.getByTestId("travel-prompt")).toContainText("open gate");
+	await page.keyboard.press("e");
+	await expect(page.getByTestId("travel-prompt")).toContainText("close gate");
+
+	// Placement is still owner-only.
+	await page.keyboard.press("6");
+	await clickFarmTile(page, 7, 8);
+	await expect(page.getByTestId("notification-feed")).toContainText(
+		"Visitors can't farm here.",
+	);
 });
 
 test("tilled soil renders as brown dirt, not grass", async ({ page }) => {

@@ -1,5 +1,7 @@
 import * as ex from "excalibur";
 import { type FarmToolId, isFarmInBounds } from "../../shared/farm";
+import type { FenceGate } from "../../shared/types";
+import { emitGateAction } from "../socket";
 import { useGameStore } from "../store";
 import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import { farmToolForItem } from "../inventory/items";
@@ -18,6 +20,7 @@ import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
 import { TOOL_HINTS } from "./farmTools";
 import { FarmTileSync } from "./farmSceneTiles";
+import { nearbyGate } from "./gateInteraction";
 import { InputManager } from "./InputManager";
 import {
 	FARM_PLAYER_SPAWN,
@@ -29,8 +32,8 @@ import {
 	TILE_SIZE,
 	terrainAt,
 } from "./mapData";
+import { buildTerrain } from "./farmTerrain";
 import { updateFarmPlayer } from "./playerMovement";
-import { terrainFrames, terrainImage } from "./resources";
 import { SweepFx } from "./sweepFx";
 import { findTrainRest, TrainController } from "./train";
 import type { SceneActivationData, WorldArea } from "./WalkingScene";
@@ -83,33 +86,9 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.backgroundColor = ex.Color.fromHex("#79a44d");
 		this.inputManager = new InputManager();
 
-		this.sheet = ex.SpriteSheet.fromImageSource({
-			image: terrainImage,
-			grid: {
-				rows: 4,
-				columns: 4,
-				spriteWidth: TILE_SIZE,
-				spriteHeight: TILE_SIZE,
-			},
-		});
-
-		this.terrain = new ex.TileMap({
-			pos: ex.vec(0, 0),
-			tileWidth: TILE_SIZE,
-			tileHeight: TILE_SIZE,
-			columns: MAP_COLUMNS,
-			rows: MAP_ROWS,
-			renderFromTopOfGraphic: true,
-		});
-
-		for (let row = 0; row < MAP_ROWS; row += 1) {
-			for (let column = 0; column < MAP_COLUMNS; column += 1) {
-				const frame = terrainFrames[terrainAt(column, row)];
-				this.terrain
-					.getTile(column, row)
-					?.addGraphic(this.sheet.getSprite(frame.column, frame.row));
-			}
-		}
+		const { sheet, tileMap } = buildTerrain();
+		this.sheet = sheet;
+		this.terrain = tileMap;
 		this.add(this.terrain);
 
 		this.tileSync = new FarmTileSync({
@@ -120,7 +99,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 
 		// Populate saved farm props and their collision/tool footprints.
 		this.farmProps.set(useGameStore.getState().activeFarm?.prop_overrides ?? []);
-		this.fences.set(useGameStore.getState().activeFarm?.fences ?? []);
+		const farm = useGameStore.getState().activeFarm;
+		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
 
 		// The train is animated separately from the static prop layer.
 		this.train = new TrainController(findTrainRest(props), this);
@@ -180,8 +160,9 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	override onPreUpdate(engine: ex.Engine, delta: number): void {
 		this.train.update(delta);
 		this.player.graphics.visible = this.train.isParked();
-		this.farmProps.set(useGameStore.getState().activeFarm?.prop_overrides ?? []);
-		this.fences.set(useGameStore.getState().activeFarm?.fences ?? []);
+		const farm = useGameStore.getState().activeFarm;
+		this.farmProps.set(farm?.prop_overrides ?? []);
+		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
 
 		// Freeze and hide the player while the inventory modal captures input,
 		// while the fishing overlay is open, or while the train carries them.
@@ -199,7 +180,11 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		updateFarmPlayer(this.player, dir, delta, this.combo.moveSpeed);
 		updateFarmerGraphics(this.player, dir);
 
-		this.travel.update(this.player, this.inputManager, engine, this.train);
+		const gate = nearbyGate(farm?.gates ?? [], this.player.pos);
+		this.travel.update(this.player, this.inputManager, engine, this.train, gate?.prompt ?? null);
+		if (gate && this.inputManager.consumePress("KeyE", "Enter")) {
+			this.toggleGate(gate.gate);
+		}
 		this.fishing.update(this.player.pos.y, this.inputManager);
 
 		this.handleToolKeys();
@@ -233,6 +218,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		if (!this.isOwner) return;
 		if (!farmToolForItem(selectedFarmItem())) return;
 		if (this.inputManager.consumePressed("Space")) this.actOnPlayerTile();
+	}
+
+	private toggleGate(gate: FenceGate): void {
+		emitGateAction(this.owner, { kind: "toggle_gate", x: gate.x, y: gate.y }, (result) => {
+			if (!result.ok) this.report(result.error ?? "Could not move gate.");
+		});
 	}
 
 	private actOnPlayerTile(): void {
@@ -273,7 +264,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		)
 			return;
 
-		if (item === "fence" || item === "shovel") {
+		if (item === "fence" || item === "gate" || item === "shovel") {
 			actOnFence(this.owner, column, row, item, this.blocks, this.player.pos, (message) =>
 				this.report(message),
 			);

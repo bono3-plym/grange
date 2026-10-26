@@ -27,6 +27,7 @@ export type ItemId =
 	| "frost-lettuce-seed"
 	| "sunburst-tomato-seed"
 	| "fence"
+	| "gate"
 	| "shovel"
 	| RodId
 	| FishId
@@ -199,6 +200,14 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 		id: "fence", name: "Fence", kind: "building", maxStack: 99,
 		icon: "/assets/farm/fences/post.webp",
 		description: "Click grass to place a fence post. Adjacent posts connect automatically.",
+	},
+	gate: {
+		id: "gate",
+		name: "Gate",
+		kind: "building",
+		maxStack: 99,
+		icon: "/assets/farm/fences/gate-closed-horizontal.webp",
+		description: "Click grass to place a gate. Walk up and press E to open it.",
 	},
 	shovel: {
 		id: "shovel", name: "Shovel", kind: "tool", maxStack: 1,

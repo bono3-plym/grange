@@ -96,6 +96,7 @@ export default function FarmMap() {
 
 	useEffect(() => {
 		if (heldItem === "fence") pushNotice("Fence: click clear grass to place a post.", "system");
+		if (heldItem === "gate") pushNotice("Gate: click clear grass to place. Press E nearby to open or close.", "system");
 		if (heldItem === "shovel") pushNotice("Shovel: click a fence or farm object to dig it up.", "system");
 		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
 			pushNotice(`Click clear ground to place ${heldItem}.`, "system");
@@ -105,6 +106,11 @@ export default function FarmMap() {
 	useEffect(() => {
 		if (fenceCount !== undefined && isOwner) setItemCount("fence", fenceCount);
 	}, [fenceCount, isOwner, setItemCount]);
+
+	const gateCount = farm?.gate_count;
+	useEffect(() => {
+		if (gateCount !== undefined && isOwner) setItemCount("gate", gateCount);
+	}, [gateCount, isOwner, setItemCount]);
 
 	const propInventory = farm?.prop_inventory;
 	useEffect(() => {
