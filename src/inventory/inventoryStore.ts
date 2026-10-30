@@ -65,6 +65,10 @@ interface InventoryState {
 	setInventoryOpen: (open: boolean) => void;
 	toggleInventory: () => void;
 	moveStack: (from: SlotRef, to: SlotRef) => void;
+	/** Sends a stack to the other area (hotbar <-> grid), topping up existing
+	 *  partial stacks of the same item first, then the first empty slot.
+	 *  Used by shift-click. */
+	quickMove: (from: SlotRef) => void;
 	splitHalf: (from: SlotRef, to: SlotRef) => void;
 	addItem: (itemId: ItemId, count: number) => number;
 	/** Removes up to `count` of an item across slots. Returns how many were removed. */
@@ -131,6 +135,28 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 		}
 
 		set({ grid: nextGrid, hotbar: nextHotbar });
+	},
+
+	quickMove: (from) => {
+		const source = slotsOf(get(), from.area)[from.index];
+		if (!source?.itemId || source.count <= 0) return;
+		const itemId = source.itemId;
+		const destArea: SlotArea = from.area === "grid" ? "hotbar" : "grid";
+		const max = ITEMS[itemId].maxStack;
+		// Top up existing partial stacks of the same item first, so a quick move
+		// can't leave a fragmented pile behind.
+		if (max > 1) {
+			for (let i = 0; i < slotsOf(get(), destArea).length; i += 1) {
+				const slot = slotsOf(get(), destArea)[i];
+				if (slot.itemId !== itemId || slot.count >= max) continue;
+				get().moveStack(from, { area: destArea, index: i });
+				if (!slotsOf(get(), from.area)[from.index]?.itemId) return;
+			}
+		}
+		const still = slotsOf(get(), from.area)[from.index];
+		if (!still?.itemId) return;
+		const empty = slotsOf(get(), destArea).findIndex((slot) => !slot.itemId);
+		if (empty >= 0) get().moveStack(from, { area: destArea, index: empty });
 	},
 
 	splitHalf: (from, to) => {
@@ -236,18 +262,31 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 	setItemCount: (itemId, count) => {
 		const state = get();
 		const keepsEmptySlot = itemId === "fence" || itemId === "gate";
-		if (count <= 0 && !keepsEmptySlot &&
+		if (
+			count <= 0 &&
+			!keepsEmptySlot &&
 			!state.hotbar.some((slot) => slot.itemId === itemId) &&
-			!state.grid.some((slot) => slot.itemId === itemId)) return;
-		const nextGrid = state.grid.map((slot) => slot.itemId === itemId ? emptySlot() : slot);
-		const nextHotbar = state.hotbar.map((slot) => slot.itemId === itemId ? emptySlot() : slot);
+			!state.grid.some((slot) => slot.itemId === itemId)
+		)
+			return;
+		const nextGrid = state.grid.map((slot) =>
+			slot.itemId === itemId ? emptySlot() : slot,
+		);
+		const nextHotbar = state.hotbar.map((slot) =>
+			slot.itemId === itemId ? emptySlot() : slot,
+		);
 		if (count <= 0 && !keepsEmptySlot) {
 			set({ grid: nextGrid, hotbar: nextHotbar });
 			return;
 		}
-		const hotbarIndex = state.hotbar.findIndex((slot) => slot.itemId === itemId);
+		const hotbarIndex = state.hotbar.findIndex(
+			(slot) => slot.itemId === itemId,
+		);
 		const gridIndex = state.grid.findIndex((slot) => slot.itemId === itemId);
-		const next = stack(itemId, Math.max(0, Math.min(count, ITEMS[itemId].maxStack)));
+		const next = stack(
+			itemId,
+			Math.max(0, Math.min(count, ITEMS[itemId].maxStack)),
+		);
 		if (hotbarIndex >= 0) nextHotbar[hotbarIndex] = next;
 		else if (gridIndex >= 0) nextGrid[gridIndex] = next;
 		else {

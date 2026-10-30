@@ -7,6 +7,7 @@ import {
 	type MarketDefinition,
 	type MarketItemId,
 } from "./marketData";
+import { PurchaseSlider } from "./PurchaseSlider";
 import "./marketWindow.css";
 
 /** What a category needs to draw one tradeable item card. */
@@ -16,6 +17,8 @@ export interface MarketItemControl {
 	actionLabel: string;
 	/** When set, the card shows a quantity stepper capped at this value. */
 	maxQuantity?: number;
+	/** When set, the card shows an incremental purchase slider capped here. */
+	sliderMax?: number;
 	onAction: (quantity: number) => void;
 }
 
@@ -185,7 +188,8 @@ export function MarketWindow({
 						{active.items.map((id) => {
 							const item = MARKET_ITEMS[id];
 							const control = controls[id];
-							const max = control.maxQuantity;
+							const sliderMax = control.sliderMax;
+							const max = sliderMax ?? control.maxQuantity;
 							const quantity = clampQuantity(quantities[id] ?? 1, max ?? 1);
 							return (
 								<article
@@ -204,7 +208,18 @@ export function MarketWindow({
 									>
 										Owned: {control.owned}
 									</span>
-									{max === undefined ? (
+									{sliderMax !== undefined ? (
+										<PurchaseSlider
+											id={id}
+											value={quantity}
+											max={sliderMax}
+											price={item.price}
+											disabled={control.disabled}
+											actionLabel={control.actionLabel}
+											onChange={(value) => setQuantity(id, value, sliderMax)}
+											onAction={control.onAction}
+										/>
+									) : max === undefined ? (
 										<button
 											type="button"
 											className="market-item-action"

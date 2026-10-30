@@ -122,6 +122,18 @@ test("the seed market opens a window with a seeds tab", async ({ page }) => {
 	await expect(page.getByTestId("farm-balance")).toContainText("92");
 	await expect(page.getByTestId("market-owned-tomato-seed")).toContainText("11");
 
+	// The seed slider buys in bulk: nudge it to 3 and the button totals the cost.
+	const slider = page.getByTestId("market-slider-tomato-seed");
+	await expect(slider).toBeVisible();
+	await slider.press("ArrowRight");
+	await slider.press("ArrowRight");
+	await expect(page.getByTestId("market-action-tomato-seed")).toContainText(
+		"Buy 3 for $24",
+	);
+	await page.getByTestId("market-action-tomato-seed").click();
+	await expect(page.getByTestId("farm-balance")).toContainText("68");
+	await expect(page.getByTestId("market-owned-tomato-seed")).toContainText("14");
+
 	await page.keyboard.press("Escape");
 	await expect(market).toHaveCount(0);
 	await expect(prompt).toContainText("enter the seed market");

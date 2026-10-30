@@ -8,6 +8,7 @@ import { type FishId, isFishId, isRodId, RODS } from "./fishingData";
 import { useFishingStore } from "./fishingStore";
 import type { MarketItemControl } from "./MarketWindow";
 import { MARKET_ITEMS, type MarketId, type MarketItemId } from "./marketData";
+import { seedPurchaseCap } from "./seedPurchase";
 import { useEconomyBalance } from "./useEconomy";
 
 /** Market seed id -> the inventory item it grants. */
@@ -46,19 +47,18 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 		setMarketMessage(null);
 	}
 
-	function buySeed(id: MarketItemId) {
+	function buySeed(id: MarketItemId, quantity: number) {
 		const item = MARKET_ITEMS[id];
 		const itemId = SEED_ITEMS[id];
-		if (!itemId) return;
-		const result = economy.buy(item.price * item.quantity);
+		if (!itemId || quantity < 1) return;
+		const cost = item.price * quantity;
+		const result = economy.buy(cost);
 		if (!result.success) {
 			setMarketMessage(result.error ?? "Purchase failed.");
 			return;
 		}
-		addItem(itemId, item.quantity);
-		setMarketMessage(
-			`Bought ${item.quantity} ${item.name} for $${item.price * item.quantity}.`,
-		);
+		addItem(itemId, quantity);
+		setMarketMessage(`Bought ${quantity} ${item.name} for $${cost}.`);
 	}
 
 	function sellProduce(id: MarketItemId, quantity: number) {
@@ -136,13 +136,17 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 				];
 			}
 			if (item.kind === "buy") {
+				const seedId = SEED_ITEMS[item.id];
 				return [
 					item.id,
 					{
 						owned: seedOwned[item.id] ?? 0,
-						disabled: balance < item.price * item.quantity,
+						disabled: balance < item.price,
 						actionLabel: "Buy",
-						onAction: () => buySeed(item.id),
+						sliderMax: seedId
+							? seedPurchaseCap(balance, item.price, seedId)
+							: undefined,
+						onAction: (quantity: number) => buySeed(item.id, quantity),
 					},
 				];
 			}

@@ -214,6 +214,25 @@
 	text-align: center;
 }
 
+.market-slider {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	width: 100%;
+	margin-top: 0.3rem;
+}
+
+.market-slider-input {
+	width: 100%;
+	accent-color: #a7c957;
+	cursor: pointer;
+}
+
+.market-slider-input:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
 .market-message {
 	margin: 0.75rem 0 0;
 	color: #f0c040;
