@@ -143,7 +143,7 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 						owned: seedOwned[item.id] ?? 0,
 						disabled: balance < item.price,
 						actionLabel: "Buy",
-						sliderMax: seedId
+						maxQuantity: seedId
 							? seedPurchaseCap(balance, item.price, seedId)
 							: undefined,
 						onAction: (quantity: number) => buySeed(item.id, quantity),
