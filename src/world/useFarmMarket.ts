@@ -47,18 +47,34 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 		setMarketMessage(null);
 	}
 
-	function buySeed(id: MarketItemId, quantity: number) {
+	async function buySeed(id: MarketItemId, quantity: number) {
 		const item = MARKET_ITEMS[id];
-		const itemId = SEED_ITEMS[id];
-		if (!itemId || quantity < 1) return;
-		const cost = item.price * quantity;
-		const result = economy.buy(cost);
-		if (!result.success) {
-			setMarketMessage(result.error ?? "Purchase failed.");
-			return;
+		if (!SEED_ITEMS[id] || quantity < 1) return;
+		try {
+			const res = await fetch("/api/inventory/buy", {
+				method: "POST",
+				credentials: "same-origin",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ item: id, quantity }),
+			});
+			const data = (await res.json()) as {
+				ok: boolean;
+				error?: string;
+				balance?: number;
+				seeds?: Record<string, number>;
+			};
+			if (!res.ok || !data.ok) {
+				setMarketMessage(data.error ?? "Purchase failed.");
+				return;
+			}
+			if (typeof data.balance === "number") economy.setBalance(data.balance);
+			if (data.seeds) useInventoryStore.getState().hydrateSeeds(data.seeds);
+			setMarketMessage(
+				`Bought ${quantity} ${item.name} for $${item.price * quantity}.`,
+			);
+		} catch {
+			setMarketMessage("Could not reach the market.");
 		}
-		addItem(itemId, quantity);
-		setMarketMessage(`Bought ${quantity} ${item.name} for $${cost}.`);
 	}
 
 	function sellProduce(id: MarketItemId, quantity: number) {
