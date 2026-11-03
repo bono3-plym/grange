@@ -276,7 +276,7 @@ export default function FarmMap() {
 					</p>
 				</div>
 			)}
-			{(!isOwner || inventoryHydrated) && (
+			{!market && (!isOwner || inventoryHydrated) && (
 				<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
 			)}
 			<ComboCounter />

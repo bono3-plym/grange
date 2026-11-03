@@ -43,12 +43,12 @@ test("the hardware stall opens a market window and sells sprinklers", async ({
 	await expect(page.getByTestId("farm-balance")).toContainText("100");
 
 	// Tools tab: you already own the starter tools, so they read as owned.
-	await expect(page.getByTestId("market-tab-equipment")).toBeVisible();
+	await expect(page.getByTestId("market-subtab-equipment")).toBeVisible();
 	await expect(page.getByTestId("market-owned-hoe")).toContainText("1");
 	await expect(page.getByTestId("market-action-hoe")).toBeDisabled();
 
 	// Building tab: fences and gates restock the farm supply.
-	await page.getByTestId("market-tab-build").click();
+	await page.getByTestId("market-subtab-build").click();
 	await expect(
 		page.getByTestId("market-item-fence").locator("img"),
 	).toHaveCount(1);
@@ -58,7 +58,7 @@ test("the hardware stall opens a market window and sells sprinklers", async ({
 	await expect(page.getByTestId("farm-balance")).toContainText("95");
 
 	// Automation tab sells sprinklers.
-	await page.getByTestId("market-tab-supplies").click();
+	await page.getByTestId("market-subtab-supplies").click();
 	await expect(page.getByTestId("market-item-sprinkler")).toContainText(
 		"Sprinkler",
 	);
