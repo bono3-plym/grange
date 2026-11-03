@@ -11,6 +11,7 @@ export function useFarmObjectInventory(farm: ActiveFarm | null, isOwner: boolean
 	const inventoryHydrated = useInventoryStore((s) => s.inventoryHydrated);
 	const fenceCount = farm?.fence_count;
 	const gateCount = farm?.gate_count;
+	const sprinklerCount = farm?.sprinkler_count;
 	const propInventory = farm?.prop_inventory;
 	const ownedAnimals = farm?.animals;
 
@@ -20,6 +21,10 @@ export function useFarmObjectInventory(farm: ActiveFarm | null, isOwner: boolean
 	useEffect(() => {
 		if (inventoryHydrated && gateCount !== undefined && isOwner) setItemCount("gate", gateCount);
 	}, [gateCount, isOwner, inventoryHydrated, setItemCount]);
+	useEffect(() => {
+		if (inventoryHydrated && sprinklerCount !== undefined && isOwner)
+			setItemCount("sprinkler", sprinklerCount);
+	}, [sprinklerCount, isOwner, inventoryHydrated, setItemCount]);
 	useEffect(() => {
 		if (!inventoryHydrated || !propInventory || !isOwner) return;
 		for (const asset of MOVABLE_PROP_ASSETS)
@@ -41,6 +46,8 @@ export function useFarmItemNotices(heldItem: string | null): void {
 			pushNotice("Gate: click clear grass to place. Press E nearby to open or close.", "system");
 		if (heldItem === "shovel")
 			pushNotice("Shovel: click a fence or farm object to dig it up.", "system");
+		if (heldItem === "sprinkler")
+			pushNotice("Hold left mouse to preview a sprinkler; release on green to place.", "system");
 		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
 			pushNotice(`Hold left mouse to preview ${heldItem}; release on green to place.`, "system");
 	}, [heldItem, pushNotice]);

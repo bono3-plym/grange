@@ -21,6 +21,7 @@ import type { MarketId } from "./marketData";
 import { MarketplaceScene } from "./MarketplaceScene";
 import { marketplaceResources } from "./marketplaceResources";
 import { resources } from "./resources";
+import { sprinklerResources } from "./sprinklerResources";
 import { consumeTrainArrival } from "./trainArrival";
 import type { WorldArea } from "./WalkingScene";
 
@@ -31,6 +32,7 @@ const worldResources = [
 		...casinoResources,
 		...livestockResources,
 		...bankResources,
+		...sprinklerResources,
 	]),
 ];
 

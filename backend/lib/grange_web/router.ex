@@ -32,6 +32,8 @@ defmodule GrangeWeb.Router do
     put("/inventory", InventoryController, :replace)
     post("/inventory/buy", InventoryController, :buy)
 
+    post("/hardware/buy", HardwareController, :buy)
+
     get("/state", HealthController, :state)
 
     # Test hook: lets e2e runs start from a clean slate. Compiled out of

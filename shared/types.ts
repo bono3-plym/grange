@@ -38,6 +38,12 @@ export interface FenceGate {
 	open: boolean;
 }
 
+/** A sprinkler anchored at the top-left tile of the 2x2 block it waters. */
+export interface FarmSprinkler {
+	x: number;
+	y: number;
+}
+
 /** The full field and barn inventory for one farm. */
 export interface ActiveFarm {
 	owner: string;
@@ -57,6 +63,8 @@ export interface ActiveFarm {
 	fence_count: number;
 	gates: FenceGate[];
 	gate_count: number;
+	sprinklers: FarmSprinkler[];
+	sprinkler_count: number;
 	prop_overrides: Array<{
 		index: number;
 		asset: string;
@@ -100,7 +108,9 @@ export type FarmAction = {
 		| "place_fence"
 		| "remove_fence"
 		| "place_gate"
-		| "remove_gate";
+		| "remove_gate"
+		| "place_sprinkler"
+		| "remove_sprinkler";
 	x: number;
 	y: number;
 	/** Seed crop to plant (kind === "plant"). */

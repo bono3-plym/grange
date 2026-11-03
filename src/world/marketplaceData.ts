@@ -7,6 +7,7 @@ export type MarketplacePropKey =
 	| "game-hall"
 	| "livestock-pavilion"
 	| "village-bank"
+	| "hardware-store"
 	| "seed-display"
 	| "produce-cart"
 	| "notice-board"
@@ -26,6 +27,7 @@ export const MARKETPLACE_SEED_MARKET_ENTRANCE = { x: 190, y: 350 } as const;
 export const MARKETPLACE_PRODUCE_MARKET_ENTRANCE = { x: 575, y: 350 } as const;
 export const MARKETPLACE_LIVESTOCK_ENTRANCE = { x: 650, y: 575 } as const;
 export const MARKETPLACE_BANK_ENTRANCE = { x: 1310, y: 570 } as const;
+export const MARKETPLACE_HARDWARE_ENTRANCE = { x: 1230, y: 355 } as const;
 export const MARKETPLACE_COLUMNS = 24;
 export const MARKETPLACE_WIDTH = MARKETPLACE_COLUMNS * 64;
 
@@ -53,6 +55,7 @@ export const marketplaceProps: RenderedProp<MarketplacePropKey>[] = [
 	{ asset: "produce-cart", x: 375, y: 505, width: 160 },
 	{ asset: "livestock-pavilion", x: 650, y: 545, width: 295 },
 	{ asset: "village-bank", x: 1310, y: 545, width: 250 },
+	{ asset: "hardware-store", x: 1230, y: 300, width: 220 },
 	{ asset: "signpost", x: 660, y: 685, width: 88 },
 	{ asset: "starter-train", x: 935, y: 735, width: 390 },
 	{ asset: "oak-tree", x: 60, y: 205, width: 105 },

@@ -193,9 +193,18 @@ export function MarketWindow({
 									className="market-item"
 									data-testid={`market-item-${id}`}
 								>
-									<span className="market-item-emoji" aria-hidden="true">
-										{item.emoji}
-									</span>
+									{item.icon ? (
+										<img
+											className="market-item-icon"
+											src={item.icon}
+											alt=""
+											aria-hidden="true"
+										/>
+									) : (
+										<span className="market-item-emoji" aria-hidden="true">
+											{item.emoji}
+										</span>
+									)}
 									<span className="market-item-name">{item.name}</span>
 									<span className="market-item-price">{item.blurb}</span>
 									<span

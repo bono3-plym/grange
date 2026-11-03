@@ -30,6 +30,7 @@ export type ItemId =
 	| "fence"
 	| "gate"
 	| "shovel"
+	| "sprinkler"
 	| AnimalId
 	| RodId
 	| FishId
@@ -215,6 +216,14 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 		id: "shovel", name: "Shovel", kind: "tool", maxStack: 1,
 		icon: "/assets/farm/objects/shovel.svg",
 		description: "Click a fence or farm object to dig it up into inventory.",
+	},
+	sprinkler: {
+		id: "sprinkler",
+		name: "Sprinkler",
+		kind: "building",
+		maxStack: 99,
+		icon: "/assets/farm/objects/sprinkler.webp",
+		description: "Place on a tile corner to keep the four surrounding tiles watered.",
 	},
 	cow: { id: "cow", name: "Cow", kind: "animal", maxStack: 99,
 		icon: "/assets/farm/animals/cow/idle-01.webp",

@@ -232,6 +232,7 @@ auth is the `_grange_key` cookie; the socket uses the token instead.
 | GET | `/api/auth/me` | cookie | `{ok, user, token}` or 401 |
 | POST | `/api/auth/logout` | cookie | Destroys the session, clears the cookie |
 | POST | `/api/economy/transaction` | cookie | `{delta}` integer; clamped at zero |
+| POST | `/api/hardware/buy` | cookie | `{item, quantity}` → `{balance, sprinkler_count}` |
 | GET | `/api/state` | none | `{playerCount, farmCount}` |
 | POST | `/api/reset` | none | Dev/test only; wipes accounts and farms |
 
@@ -541,16 +542,17 @@ not rendered UI.
 | --- | --- | --- |
 | `users` | `id` string PK, `username` unique, `email` unique, `password_hash`, `balance` default 100, `is_admin` default false, `inserted_at` | IDs are 32-char lowercase hex strings. No `updated_at`. |
 | `sessions` | `token_hash` string PK, `user_id` FK → `users.id`, `expires_at`, `inserted_at` | Only the SHA-256 hash is stored. |
-| `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. |
+| `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `sprinkler_count` default 0, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. |
 | `tiles` | `id`, `owner` FK → `farms.owner`, `x`, `y`, `state` string, `crop` string, `planted_at`/`watered_at`/`ready_at` integer ms | Unique `(owner, x, y)`. `state` is one of `tilled`, `planted`, `watered`, `ready`. |
 | `barn_items` | `owner` FK, `item`, `count` | Unique `(owner, item)`. `item` is a crop id. |
 | `farm_fences` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. |
 | `farm_gates` | `owner` FK, `x`, `y`, `direction`, `open` | Unique `(owner, x, y)`. `direction` is `horizontal` or `vertical`. |
+| `farm_sprinklers` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. `(x, y)` is the top-left tile of the watered 2x2; the object is drawn on that 2x2's shared corner. |
 | `farm_props` | `owner` FK, `source_index`, `asset`, `x`, `y`, `carried` | Unique `(owner, source_index)`. Indices map to the starter prop list. |
 
 All foreign keys cascade on farm delete. `Accounts.reset/0` deletes sessions
 then users; `FarmStore.reset/0` deletes tiles, barn items, fences, gates,
-props, then farms.
+sprinklers, props, then farms.
 
 ### 7.2 Wire types (`shared/types.ts`)
 
@@ -580,6 +582,8 @@ export interface ActiveFarm {
   fence_count: number;
   gates: FenceGate[];
   gate_count: number;
+  sprinklers: FarmSprinkler[];   // anchored by the 2x2's top-left tile
+  sprinkler_count: number;
   prop_overrides: Array<{
     index: number; asset: string; x: number; y: number; carried: boolean;
   }>;
@@ -589,7 +593,8 @@ export interface ActiveFarm {
 export type FarmAction = {
   kind:
     | "till" | "plant" | "water" | "harvest"
-    | "place_fence" | "remove_fence" | "place_gate" | "remove_gate";
+    | "place_fence" | "remove_fence" | "place_gate" | "remove_gate"
+    | "place_sprinkler" | "remove_sprinkler";
   x: number;
   y: number;
   crop?: CropId;                       // plant only
@@ -743,6 +748,22 @@ chance = (0.0015 + (synergyActive ? 0.0025 : 0)) * comboMultiplier
   indices live in `FarmProps.@assets`. **Adding or reordering starter props
   requires updating those indices.**
 - Placement uses drag previews and validates terrain/obstacles/collisions.
+- **Sprinklers** are a separate `farm_sprinklers` table, bought at the
+  hardware-market stall in the marketplace (opened as the "Hardware Store"
+  market window; `POST /api/hardware/buy`) and tracked on
+  `farms.sprinkler_count`. A sprinkler is anchored by the top-left tile of a
+  2x2 and drawn on the corner those four tiles share; it may sit on grass or
+  worked (tilled/planted) soil without blocking the tile. While it stands,
+  every planted tile in its square is watered on the next `FarmStore.tick/1`
+  (via `Grange.FieldWater`), so it keeps its 2x2 saturated until it is
+  shoveled up. The client mirrors `sprinkler_count` into the hotbar; the placed
+  sprite is a static green base plus a brass rotor that spins briefly about once
+  a minute with a water spray (`SprinklerLayer`), and it is drawn below the crop
+  layer so a mature plant always renders in front of it.
+- The hardware store stall also **restocks fences and gates** (they spend the
+  farm's supply counts) and sells the basic tools (hoe, watering can, scythe,
+  shovel) as one-off purchases. The tools read as "Owned" because the starter
+  hotbar already grants them.
 
 ### 8.6 Farm visibility and visitor editing
 

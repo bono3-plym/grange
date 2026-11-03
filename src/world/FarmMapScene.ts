@@ -10,6 +10,8 @@ import { CropLayer } from "./cropLayer";
 import { FenceLayer } from "./fenceRendering";
 import { FencePlacementPreview } from "./FencePlacementPreview";
 import { FrameClock } from "./frameClock";
+import { SprinklerPlacementPreview } from "./SprinklerPlacementPreview";
+import { SprinklerLayer } from "./sprinklerRendering";
 import { selectedFarmItem } from "./fenceActions";
 import { performFarmAction } from "./farmActionRunner";
 import { FarmPropLayer } from "./farmPropLayer";
@@ -56,6 +58,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private readonly farmProps = new FarmPropLayer(this, this.blocks);
 	private readonly placement = new FarmPlacementPreview(this, this.farmProps);
 	private readonly fencePlacement = new FencePlacementPreview(this);
+	private readonly sprinklers = new SprinklerLayer(this);
+	private readonly sprinklerPlacement = new SprinklerPlacementPreview(this);
 	private paintedLandLevel = -1;
 	private toolInput!: FarmToolInput;
 	private message = TOOL_HINTS.hoe;
@@ -115,6 +119,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		const farm = useGameStore.getState().activeFarm;
 		setFarmLandLevel(farm?.land_level ?? 0);
 		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
+		this.sprinklers.set(farm?.sprinklers ?? []);
 
 		// The train is animated separately from the static prop layer.
 		this.train = new TrainController(findTrainRest(props), this);
@@ -129,6 +134,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			farmProps: this.farmProps,
 			placement: this.placement,
 			fencePlacement: this.fencePlacement,
+			sprinklerPlacement: this.sprinklerPlacement,
 			canEdit: () => this.canEdit(),
 			isDeactivated: () => this.deactivated,
 			report: (message) => this.report(message),
@@ -179,6 +185,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		) {
 			this.fencePlacement.clear();
 		}
+		if (
+			this.sprinklerPlacement.active &&
+			(isInventoryBlockingInput() || selectedFarmItem() !== "sprinkler")
+		) {
+			this.sprinklerPlacement.clear();
+		}
 		this.train.update(step);
 		this.player.graphics.visible = this.train.isParked();
 		const farm = useGameStore.getState().activeFarm;
@@ -190,6 +202,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		}
 		this.farmProps.set(farm?.prop_overrides ?? []);
 		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
+		this.sprinklers.set(farm?.sprinklers ?? []);
+		this.sprinklers.update(step);
 		this.presence?.update(step);
 
 		// Freeze and hide the player while the inventory modal captures input,
@@ -266,6 +280,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.deactivated = true;
 		this.placement.clear();
 		this.fencePlacement.clear();
+		this.sprinklerPlacement.clear();
 		this.toolInput?.clear();
 		this.inputManager?.destroy();
 		this.travel.deactivate();

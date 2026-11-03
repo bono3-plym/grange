@@ -5,6 +5,7 @@ import {
 	MARKETPLACE_CASINO_ENTRANCE,
 	MARKETPLACE_LIVESTOCK_ENTRANCE,
 	MARKETPLACE_BANK_ENTRANCE,
+	MARKETPLACE_HARDWARE_ENTRANCE,
 	MARKETPLACE_COLUMNS,
 	MARKETPLACE_WIDTH,
 	MARKETPLACE_PLAYER_SPAWN,
@@ -51,6 +52,15 @@ export class MarketplaceScene extends WalkingScene {
 					destination: "bank",
 					prompt: "Press E or Enter to enter the bank",
 					radius: 72,
+				},
+				{
+					position: ex.vec(
+						MARKETPLACE_HARDWARE_ENTRANCE.x,
+						MARKETPLACE_HARDWARE_ENTRANCE.y,
+					),
+					prompt: "Press E or Enter to shop at the hardware store",
+					radius: 95,
+					action: () => onOpenMarket("hardware"),
 				},
 				{
 					position: ex.vec(

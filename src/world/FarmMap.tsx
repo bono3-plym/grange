@@ -232,6 +232,9 @@ export default function FarmMap() {
 			data-world-ready={worldReady ? "true" : "false"}
 			data-hub-peers={hubPeers.join(",")}
 			data-farm-peers={farmPeers.join(",")}
+			data-sprinklers={(farm?.sprinklers ?? [])
+				.map((s) => `${s.x},${s.y}`)
+				.join(";")}
 		>
 			<canvas
 				ref={canvasRef}

@@ -8,6 +8,8 @@ import { actOnFence, selectedFarmItem } from "./fenceActions";
 import { handleFarmPropClick, placeFarmProp } from "./farmPropActions";
 import type { FarmPlacementPreview } from "./FarmPlacementPreview";
 import type { FarmPropLayer } from "./farmPropLayer";
+import { actOnSprinkler, sprinklerNear } from "./sprinklerActions";
+import type { SprinklerPlacementPreview } from "./SprinklerPlacementPreview";
 import {
 	isMovablePropAsset,
 	ownsFarmTile,
@@ -22,6 +24,7 @@ export interface FarmToolHost {
 	farmProps: FarmPropLayer;
 	placement: FarmPlacementPreview;
 	fencePlacement: FencePlacementPreview;
+	sprinklerPlacement: SprinklerPlacementPreview;
 	canEdit(): boolean;
 	isDeactivated(): boolean;
 	report(text: string): void;
@@ -61,6 +64,10 @@ export class FarmToolInput {
 					evt.worldPos, farm, this.host.blocks, this.host.player.pos,
 				);
 			}
+			if (item === "sprinkler" && farm) {
+				if (!this.host.canEdit()) return this.host.reportReadOnly();
+				return this.host.sprinklerPlacement.start(evt.worldPos, farm);
+			}
 			this.painting = farmToolForItem(item) !== null;
 			this.strokeTiles.clear();
 			this.applyToolAt(evt.worldPos);
@@ -73,6 +80,8 @@ export class FarmToolInput {
 				this.host.placement.update(evt.worldPos, this.host.player.pos, farm);
 			if (this.host.fencePlacement.active && farm)
 				this.host.fencePlacement.update(evt.worldPos, farm, this.host.blocks, this.host.player.pos);
+			if (this.host.sprinklerPlacement.active && farm)
+				this.host.sprinklerPlacement.update(evt.worldPos, farm);
 			if (this.painting) this.applyToolAt(evt.worldPos);
 		});
 		pointers.primary.on("up", (evt) => {
@@ -88,6 +97,11 @@ export class FarmToolInput {
 				this.host.fencePlacement.release(evt.worldPos, farm, this.host.blocks, this.host.player.pos,
 					this.host.owner, (message) => this.host.report(message));
 			} else this.host.fencePlacement.clear();
+			if (this.host.sprinklerPlacement.active && farm && !this.disabled() && this.host.canEdit() &&
+				selectedFarmItem() === "sprinkler") {
+				this.host.sprinklerPlacement.release(evt.worldPos, farm, this.host.owner,
+					(message) => this.host.report(message));
+			} else this.host.sprinklerPlacement.clear();
 			this.clear();
 		});
 	}
@@ -126,6 +140,16 @@ export class FarmToolInput {
 			useGameStore.getState().activeFarm, this.host.owner,
 			(message) => this.host.report(message)))
 			return;
+
+		if (item === "shovel") {
+			const active = useGameStore.getState().activeFarm;
+			const sprinkler = active ? sprinklerNear(active, worldPos.x, worldPos.y) : null;
+			if (sprinkler) {
+				actOnSprinkler(this.host.owner, sprinkler.x, sprinkler.y, "shovel",
+					(message) => this.host.report(message));
+				return;
+			}
+		}
 
 		if (item === "gate" || item === "shovel") {
 			actOnFence(this.host.owner, column, row, item, this.host.blocks, this.host.player.pos,

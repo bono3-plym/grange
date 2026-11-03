@@ -126,3 +126,28 @@ The old placeholders (`farm/plants/tomato-plant.webp`, `farm/plants/wheat.webp`,
 | Gate placement, E interaction, prompts | `src/world/fenceActions.ts`, `gateInteraction.ts`, `FarmMapScene.ts` |
 | Server barn + harvest/regrow/sell | `backend/lib/grange/farm_store.ex`, `barn_item.ex` |
 | Server fence/gate persistence | `backend/lib/grange/farm_fences.ex`, `farm_gates.ex`, `farm_gate.ex` |
+
+## 7. Automation: Sprinklers & the Hardware Store
+
+- Sprinklers are bought at the **Hardware Store**, a walkable scene entered from
+  the marketplace (`POST /api/hardware/buy`, 75c each). Purchases add to
+  `farms.sprinkler_count`, which the client mirrors into the hotbar
+  (`useFarmObjectInventory.ts`).
+- A sprinkler is anchored by the top-left tile of a 2x2 block and drawn on the
+  shared corner of those four tiles (`src/world/sprinklerData.ts`). While it
+  stands, every `planted` tile in its square is watered by `FarmStore.tick/1`
+  (via `Grange.FieldWater`), using the same synergy-adjusted growth clock as a
+  watering can, so crops keep ripening. A `ready` tile is never re-watered.
+- The client draws the sprinkler as a static green base plus a brass rotor that
+  spins briefly about once a minute with a water spray
+  (`src/world/sprinklerRendering.ts`); the tick, not the animation, waters. It is
+  drawn under the crop layer, so mature plants render in front of it.
+- The hardware stall also sells the basic tools (one-off) and restocks fences and
+  gates through the same `POST /api/hardware/buy` endpoint.
+- Shoveling a sprinkler returns it to the farm's supply and stops coverage, so
+  later plantings there are no longer watered automatically.
+- Files: `src/world/sprinkler*.ts`, `SprinklerPlacementPreview.ts`; the
+  hardware stall is a marketplace stand (`marketplaceData.ts`,
+  `MarketplaceScene.ts`, `marketData.ts`, `useFarmMarket.ts`) that opens the
+  shared market window. Server: `backend/lib/grange/farm_sprinklers.ex`,
+  `field_water.ex`, `hardware.ex`, `hardware_controller.ex`.
