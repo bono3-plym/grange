@@ -125,6 +125,7 @@ The old placeholders (`farm/plants/tomato-plant.webp`, `farm/plants/wheat.webp`,
 | Fence/gate graph, collision, rendering | `src/world/fenceData.ts`, `fenceRendering.ts`, `sceneObstacles.ts` |
 | Gate placement, E interaction, prompts | `src/world/fenceActions.ts`, `gateInteraction.ts`, `FarmMapScene.ts` |
 | Server barn + harvest/regrow/sell | `backend/lib/grange/farm_store.ex`, `barn_item.ex` |
+| Server tick sweep (ripen, revert untended soil) | `backend/lib/grange/farm_tick.ex` |
 | Server fence/gate persistence | `backend/lib/grange/farm_fences.ex`, `farm_gates.ex`, `farm_gate.ex` |
 
 ## 7. Automation: Sprinklers & the Hardware Store
@@ -151,3 +152,20 @@ The old placeholders (`farm/plants/tomato-plant.webp`, `farm/plants/wheat.webp`,
   `MarketplaceScene.ts`, `marketData.ts`, `useFarmMarket.ts`) that opens the
   shared market window. Server: `backend/lib/grange/farm_sprinklers.ex`,
   `field_water.ex`, `hardware.ex`, `hardware_controller.ex`.
+
+## 8. Tilled Soil Revert
+
+Bare tilled ground dries out. A tile left in the `tilled` state for **20
+minutes** (`Farm.till_decay_ms/0`, mirrored as `FARM_TILL_DECAY_MS`) reverts to
+grass on the next tick.
+
+- Only the empty `tilled` state counts down. Planting or watering moves the tile
+  to `planted`/`watered` and clears its `tilled_at` stamp, so a crop is safe
+  until it is harvested.
+- Harvesting a crop that clears the tile back to bare ground stamps a fresh
+  `tilled_at`, restarting the window.
+- The revert is silent: no client warning, countdown, or new wire field. The
+  server deletes the tile and pushes the full farm, and the client repaints
+  grass because `FarmTileSync.sync/1` removes tiles that are no longer present.
+- Server only: `FarmTick.run/1` owns the sweep; the client-local
+  `LocalFarmStore` does not model till decay.

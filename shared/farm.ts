@@ -3,6 +3,8 @@ import { type CropId, isCropId } from "./crops";
 export const FARM_GRID_SIZE = 15;
 export const FARM_GROW_MS = 10_000;
 export const FARM_HARVEST_YIELD = 3;
+/** Bare tilled soil reverts to grass after this long without a watering. */
+export const FARM_TILL_DECAY_MS = 20 * 60 * 1000;
 
 export type FarmTileState = "tilled" | "planted" | "watered" | "ready";
 
