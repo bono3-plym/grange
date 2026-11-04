@@ -11,6 +11,7 @@ defmodule Grange.Farm do
   @grid_size 15
   @grow_ms 10_000
   @harvest_yield 3
+  @till_decay_ms 20 * 60 * 1000
 
   @typedoc "The lifecycle state of a field tile."
   @type state :: :tilled | :planted | :watered | :ready
@@ -37,6 +38,15 @@ defmodule Grange.Farm do
   @doc "How many tomatoes a harvest yields."
   @spec harvest_yield() :: pos_integer()
   def harvest_yield, do: @harvest_yield
+
+  @doc """
+  How long bare tilled ground survives untended before reverting to grass.
+
+  A tile only counts down while it is in the `:tilled` state; planting or
+  watering moves it out of that state and a later harvest restarts the clock.
+  """
+  @spec till_decay_ms() :: pos_integer()
+  def till_decay_ms, do: @till_decay_ms
 
   @doc "True when `{x, y}` is an integer coordinate inside the field."
   @spec in_bounds?(integer(), integer()) :: boolean()

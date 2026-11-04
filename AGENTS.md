@@ -498,6 +498,7 @@ not rendered UI.
 │   │   ├── accounts.ex        ← registration/login/sessions/balance
 │   │   ├── farm_store.ex      ← farm transactions, views, tick, broadcasts
 │   │   ├── farm_ticker.ex     ← 1s GenServer driving FarmStore.tick/0
+│   │   ├── farm_tick.ex       ← per-tick sweep: ripen, revert untended soil
 │   │   ├── farm.ex            ← pure tile state machine + bounds
 │   │   ├── hub.ex             ← hub area whitelist + position clamping
 │   │   ├── crops.ex           ← Elixir mirror of crop registry/mechanics
@@ -543,7 +544,7 @@ not rendered UI.
 | `users` | `id` string PK, `username` unique, `email` unique, `password_hash`, `balance` default 100, `is_admin` default false, `inserted_at` | IDs are 32-char lowercase hex strings. No `updated_at`. |
 | `sessions` | `token_hash` string PK, `user_id` FK → `users.id`, `expires_at`, `inserted_at` | Only the SHA-256 hash is stored. |
 | `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `sprinkler_count` default 0, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. |
-| `tiles` | `id`, `owner` FK → `farms.owner`, `x`, `y`, `state` string, `crop` string, `planted_at`/`watered_at`/`ready_at` integer ms | Unique `(owner, x, y)`. `state` is one of `tilled`, `planted`, `watered`, `ready`. |
+| `tiles` | `id`, `owner` FK → `farms.owner`, `x`, `y`, `state` string, `crop` string, `planted_at`/`watered_at`/`ready_at`/`tilled_at` integer ms | Unique `(owner, x, y)`. `state` is one of `tilled`, `planted`, `watered`, `ready`. `tilled_at` is set while the tile is bare `tilled` ground so `FarmTick` can revert abandoned soil to grass. |
 | `barn_items` | `owner` FK, `item`, `count` | Unique `(owner, item)`. `item` is a crop id. |
 | `farm_fences` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. |
 | `farm_gates` | `owner` FK, `x`, `y`, `direction`, `open` | Unique `(owner, x, y)`. `direction` is `horizontal` or `vertical`. |
@@ -794,6 +795,22 @@ barn. `FarmChannel` authorizes against the persisted flags; the client
 
 Private farms are omitted from the dashboard's open-farm list and from the
 train destination menu. They are hidden, not shown as locked rows.
+
+### 8.7 Tilled soil reverts to grass
+
+Bare tilled ground does not stay tilled forever. `FarmTick.run/1` (called once a
+second by `FarmTicker`) deletes any tile that has sat in the `tilled` state for
+`Farm.till_decay_ms/0` (20 minutes) and then broadcasts the farm and lobby, so
+the client repaints it as grass.
+
+- Only the bare `tilled` state counts down. Planting or watering moves the tile
+  to `planted`/`watered` and clears `tilled_at`, so a planted crop is safe until
+  it is harvested.
+- A harvest that clears the tile back to bare ground stamps a fresh
+  `tilled_at`, restarting the 20-minute window.
+- There is no warning UI: the reversion is silent and the client just receives
+  the updated farm. `tilled_at` is server-only and is not sent over the wire.
+- The server owns the rule; the client-local `LocalFarmStore` does not model it.
 
 ---
 
