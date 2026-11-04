@@ -81,7 +81,7 @@ let currentFarmLandLevel = 0;
 function rebuildFarmObstacles(): void {
 	const bounds = farmBounds(currentFarmLandLevel);
 	const water = { left: bounds.minColumn * TILE_SIZE,
-		right: (bounds.maxColumn + 1) * TILE_SIZE, top: 11 * TILE_SIZE, bottom: MAP_HEIGHT };
+		right: (bounds.maxColumn + 1) * TILE_SIZE, top: 11 * TILE_SIZE - 36, bottom: MAP_HEIGHT };
 	farmWalkObstacles.splice(0, Infinity,
 		...propObstacles(currentFarmProps, farmFootprints),
 		...fenceObstacles(currentFarmFences, currentFarmGates),
