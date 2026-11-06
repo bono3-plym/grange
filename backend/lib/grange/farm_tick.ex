@@ -4,8 +4,9 @@ defmodule Grange.FarmTick do
 
   Sprinklers water their squares, watered crops ripen to ready, and bare tilled
   ground that has gone untended for `Grange.Farm.till_decay_ms/0` reverts to
-  grass. Returns the owners whose farm changed so `Grange.FarmStore` can
-  broadcast each affected farm and a single lobby summary.
+  grass. Soil under a sprinkler stays moist and never decays. Returns the owners
+  whose farm changed so `Grange.FarmStore` can broadcast each affected farm and
+  a single lobby summary.
   """
 
   import Ecto.Query
@@ -32,15 +33,16 @@ defmodule Grange.FarmTick do
 
   defp revert_untended(now) do
     deadline = now - Farm.till_decay_ms()
+    covered = FarmSprinklers.covered_coords()
 
-    tiles =
-      Repo.all(
-        from(t in Tile,
-          where: t.state == :tilled and not is_nil(t.tilled_at) and t.tilled_at <= ^deadline
-        )
-      )
-
-    Enum.each(tiles, &Repo.delete!/1)
-    Enum.map(tiles, & &1.owner)
+    from(t in Tile,
+      where: t.state == :tilled and not is_nil(t.tilled_at) and t.tilled_at <= ^deadline
+    )
+    |> Repo.all()
+    |> Enum.reject(&MapSet.member?(covered, {&1.owner, &1.x, &1.y}))
+    |> Enum.map(fn tile ->
+      Repo.delete!(tile)
+      tile.owner
+    end)
   end
 end

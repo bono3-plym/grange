@@ -139,6 +139,9 @@ The old placeholders (`farm/plants/tomato-plant.webp`, `farm/plants/wheat.webp`,
   stands, every `planted` tile in its square is watered by `FarmStore.tick/1`
   (via `Grange.FieldWater`), using the same synergy-adjusted growth clock as a
   watering can, so crops keep ripening. A `ready` tile is never re-watered.
+  Bare `tilled` soil in the square is also kept moist: it is exempt from the
+  till-decay sweep (see §8), and placing or lifting the sprinkler restamps the
+  covered tiles' drying clock.
 - The client draws the sprinkler as a static green base plus a brass rotor that
   spins briefly about once a minute with a water spray
   (`src/world/sprinklerRendering.ts`); the tick, not the animation, waters. It is
@@ -161,6 +164,9 @@ minutes** (`Farm.till_decay_ms/0`) reverts to grass on the next tick.
 - Only the empty `tilled` state counts down. Planting or watering moves the tile
   to `planted`/`watered` and clears its `tilled_at` stamp, so a crop is safe
   until it is harvested.
+- Soil under a sprinkler never decays: `FarmTick.revert_untended/1` skips any
+  tile covered by a sprinkler, and placing or lifting a sprinkler restamps the
+  covered tiles' `tilled_at`, so removal starts a fresh 20-minute window.
 - Harvesting a crop that clears the tile back to bare ground stamps a fresh
   `tilled_at`, restarting the window.
 - The revert is silent: no client warning, countdown, or new wire field. The

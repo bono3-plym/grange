@@ -761,7 +761,8 @@ chance = (0.0015 + (synergyActive ? 0.0025 : 0)) * comboMultiplier
   worked (tilled/planted) soil without blocking the tile. While it stands,
   every planted tile in its square is watered on the next `FarmStore.tick/1`
   (via `Grange.FieldWater`), so it keeps its 2x2 saturated until it is
-  shoveled up. The client mirrors `sprinkler_count` into the hotbar; the placed
+  shoveled up; bare tilled soil in the square is also kept from the till-decay
+  sweep (see 8.7). The client mirrors `sprinkler_count` into the hotbar; the placed
   sprite is a static green base plus a brass rotor that spins briefly about once
   a minute with a water spray (`SprinklerLayer`), and it is drawn below the crop
   layer so a mature plant always renders in front of it.
@@ -812,6 +813,10 @@ the client repaints it as grass.
   it is harvested.
 - A harvest that clears the tile back to bare ground stamps a fresh
   `tilled_at`, restarting the 20-minute window.
+- Soil inside a sprinkler's 2x2 is exempt: `FarmTick` skips any covered tile, so
+  a sprinkler keeps its tilled ground from ever drying out. Placing or lifting a
+  sprinkler restamps the covered tiles' `tilled_at`, so removing one starts a
+  fresh 20-minute window instead of reverting on the next tick.
 - There is no warning UI: the reversion is silent and the client just receives
   the updated farm. `tilled_at` is server-only and is not sent over the wire.
 - The server owns the rule; the client only repaints what `farmUpdate`
