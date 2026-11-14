@@ -72,7 +72,6 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private readonly travel: FarmTravel;
 	private readonly barn: FarmBarn;
 	private readonly fishing: FarmFishing;
-	private readonly onOpenHouse: () => void;
 	private train!: TrainController;
 	private presence?: FarmScenePresence;
 	private paused = false;
@@ -85,11 +84,10 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		onPromptChange: (prompt: string | null) => void,
 		onAreaChange: (area: WorldArea) => void,
 		onFish: () => void,
-		onOpenHouse: () => void,
+		private readonly onOpenHouse: () => void,
 		onOpenTravel: () => void,
 	) {
 		super();
-		this.onOpenHouse = onOpenHouse;
 		this.fishing = new FarmFishing(
 			isOwner,
 			onFish,
@@ -131,7 +129,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.train = new TrainController(findTrainRest(props), this);
 
 		this.player = createFarmPlayer(this);
-		this.presence = new FarmScenePresence(this, this.player);
+		this.presence = new FarmScenePresence(this, this.player, (text) => this.report(text));
 
 		this.toolInput = new FarmToolInput({
 			owner: this.owner,
@@ -151,6 +149,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			reportReadOnly: () => this.report("The owner has visitor editing off."),
 			updateHover: (pos) => this.updateHover(pos),
 			performAction: (column, row) => this.performAction(column, row),
+			bonkAt: (pos) => this.presence?.bonkAt(pos.x, pos.y) ?? false,
 		});
 		this.toolInput.attach(engine);
 
@@ -159,7 +158,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	}
 
 	setHeldTool(tool: FarmToolId | null): void {
-		this.report(tool ? TOOL_HINTS[tool] : "Select a tool or item first.");
+		this.message = tool ? TOOL_HINTS[tool] : "Select a tool or item first.";
+		if (this.player && !this.deactivated) this.emitHud();
 	}
 
 	/** The hotbar reports a slot change so the combo tracker grants its grace. */
@@ -333,7 +333,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			tomatoes: useGameStore.getState().activeFarm?.tomatoes ?? 0,
 			message: this.message,
 			hovered: this.hovered,
-			player: { x: this.player.pos.x, y: this.player.pos.y },
+			player: this.player ? { x: this.player.pos.x, y: this.player.pos.y } : { x: 0, y: 0 },
 		});
 	}
 }

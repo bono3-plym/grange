@@ -452,6 +452,11 @@ in the same room through `getFarmPeers()`. `FarmMap` exposes the current hub and
 farm peer names as `data-hub-peers` / `data-farm-peers` for e2e tests; they are
 not rendered UI.
 
+Clicking another player while holding the shovel plays a client-only comic
+"BONK!" burst and knocks that avatar back; it works on farms (through
+`FarmToolInput` → `FarmScenePresence`) and in hubs (through `WalkingScene`). No
+server event is sent.
+
 ### 5.10 Email verification and password reset
 
 New accounts must confirm their email before they can sign in. The same

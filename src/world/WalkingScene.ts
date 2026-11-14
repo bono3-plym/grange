@@ -1,6 +1,12 @@
 import * as ex from "excalibur";
 import type { HubArea } from "../../shared/types";
+import {
+	isInventoryBlockingInput,
+	useInventoryStore,
+} from "../inventory/inventoryStore";
+import { useNotificationStore } from "../notifications/notificationStore";
 import { useGameStore } from "../store";
+import { BonkFx } from "./bonkFx";
 import { depthForY } from "./depth";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import { FrameClock } from "./frameClock";
@@ -81,9 +87,22 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 	private traveling = false;
 	private paused = false;
 	private hubPlayers?: HubPlayers;
+	private bonkFx?: BonkFx;
 	private readonly playerSpeed = 160;
 	/** Wall-clock gameplay step; see `frameClock.ts`. */
 	protected readonly frameClock = new FrameClock();
+
+	/** A shovel click on another hub player is a cosmetic bonk. */
+	private readonly handleHubClick = (evt: ex.PointerEvent): void => {
+		if (this.paused || this.traveling || isInventoryBlockingInput()) return;
+		const inventory = useInventoryStore.getState();
+		if (inventory.hotbar[inventory.selectedHotbar]?.itemId !== "shovel") return;
+		const target = this.hubPlayers?.bonkAt(evt.worldPos.x, evt.worldPos.y);
+		if (!target) return;
+		this.bonkFx?.play(target.x, target.y - 40);
+		this.camera.shake(3, 3, 140);
+		useNotificationStore.getState().push("BONK!", "system");
+	};
 
 	constructor(private readonly options: WalkingSceneOptions) {
 		super();
@@ -102,6 +121,8 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		if (this.options.hubArea) {
 			const username = useGameStore.getState().username;
 			this.hubPlayers = new HubPlayers(this, this.player, username || "Farmer");
+			this.bonkFx = new BonkFx(this);
+			this.input.pointers.primary.on("down", this.handleHubClick);
 		}
 		this.camera.pos = ex.vec(MAP_WIDTH / 2, MAP_HEIGHT / 2);
 	}
@@ -158,6 +179,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 	protected walkFrame(engine: ex.Engine, step: number): void {
 		// Other players keep moving while a DOM overlay pauses the local player.
 		this.updateHub(step);
+		this.bonkFx?.update(step);
 
 		if (!this.inputManager || this.paused) return;
 		// Freeze the player while a travel animation (the train leaving) plays.
@@ -236,6 +258,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		this.inputManager = undefined;
 		this.setPrompt(null);
 		this.hubPlayers?.clear();
+		this.bonkFx?.clear();
 		if (this.options.hubArea) leaveHub();
 	}
 

@@ -2,7 +2,14 @@ import * as ex from "excalibur";
 import type { HubPeer } from "../../shared/types";
 import { depthForY } from "./depth";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
-import { remoteDirection, remoteStep, shouldSnap } from "./hubInterpolation";
+import {
+	BONK_DURATION_MS,
+	bonkPose,
+	remoteDirection,
+	remoteStep,
+	shouldSnap,
+} from "./hubInterpolation";
+import { peerHit } from "./peerHit";
 
 /** Space between the avatar's feet and the bottom of its name label. */
 const LABEL_OFFSET_Y = 70;
@@ -11,6 +18,16 @@ interface RemoteAvatar {
 	actor: ex.Actor;
 	label: ex.Actor;
 	target: { x: number; y: number };
+	/** Eased position without the bonk knockback applied. */
+	base: { x: number; y: number };
+	bonk: { elapsed: number; direction: number } | null;
+}
+
+/** A remote farmer under the pointer that can be bonked. */
+export interface BonkTarget {
+	name: string;
+	x: number;
+	y: number;
 }
 
 /**
@@ -65,17 +82,44 @@ export class HubPlayers {
 
 		for (const remote of this.remotes.values()) {
 			const actor = remote.actor;
-			const before = { x: actor.pos.x, y: actor.pos.y };
+			const before = remote.base;
 			const next = shouldSnap(before, remote.target)
 				? remote.target
 				: remoteStep(before, remote.target, deltaMs);
+			remote.base = next;
 
-			actor.pos.x = next.x;
+			if (remote.bonk) {
+				remote.bonk.elapsed += deltaMs;
+				if (remote.bonk.elapsed >= BONK_DURATION_MS) remote.bonk = null;
+			}
+			const pose = remote.bonk
+				? bonkPose(remote.bonk.elapsed, remote.bonk.direction)
+				: { offsetX: 0, rotation: 0 };
+
+			actor.pos.x = next.x + pose.offsetX;
 			actor.pos.y = next.y;
+			actor.rotation = pose.rotation;
 			actor.z = depthForY(next.y);
 			updateFarmerGraphics(actor, remoteDirection(before, next));
 			this.placeLabel(remote.label, actor.pos, actor.z);
 		}
+	}
+
+	/**
+	 * Bonks the remote avatar under a world point and returns it.
+	 *
+	 * Purely cosmetic: no farm or presence state changes. The knockback pushes
+	 * the avatar away from the local player so the comic reaction reads even
+	 * when the attacker clicks the victim's feet.
+	 */
+	bonkAt(x: number, y: number): BonkTarget | null {
+		for (const [name, remote] of this.remotes) {
+			if (!peerHit(remote.base, x, y)) continue;
+			const away = remote.base.x - this.local.pos.x;
+			remote.bonk = { elapsed: 0, direction: away < 0 ? -1 : 1 };
+			return { name, x: remote.base.x, y: remote.base.y };
+		}
+		return null;
 	}
 
 	/** Removes every remote avatar; used when leaving the hub area. */
@@ -102,7 +146,8 @@ export class HubPlayers {
 		this.scene.add(label);
 		this.placeLabel(label, actor.pos, actor.z);
 
-		return { actor, label, target: { x: peer.x, y: peer.y } };
+		const base = { x: peer.x, y: peer.y };
+		return { actor, label, target: { ...base }, base, bonk: null };
 	}
 
 	private placeLabel(label: ex.Actor, pos: ex.Vector, z: number): void {

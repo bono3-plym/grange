@@ -42,6 +42,8 @@ export interface FarmToolHost {
 	reportReadOnly(): void;
 	updateHover(pos: ex.Vector): void;
 	performAction(column: number, row: number): void;
+	/** True when the shovel click landed on another player. */
+	bonkAt(pos: ex.Vector): boolean;
 }
 
 /**
@@ -162,6 +164,10 @@ export class FarmToolInput {
 			this.host.report("Too far away to reach that.");
 			return;
 		}
+
+		// A shovel click on another player is a harmless comic bonk, not a farm
+		// edit, so it wins over props and tiles and works on read-only visits.
+		if (item === "shovel" && this.host.bonkAt(worldPos)) return;
 
 		const edit = this.host.canEdit();
 		const landLevel = useGameStore.getState().activeFarm?.land_level ?? 0;
