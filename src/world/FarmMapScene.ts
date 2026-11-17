@@ -36,7 +36,7 @@ import { nearbyGate, toggleGate } from "./gateInteraction";
 import { InputManager } from "./InputManager";
 import { MAP_HEIGHT, MAP_WIDTH, props } from "./mapData";
 import { shouldShowNpc } from "./npcStore";
-import { LandBorderHint, updateFarmPlayer } from "./playerMovement";
+import { updateFarmPlayer } from "./playerMovement";
 import { setFarmLandLevel } from "./sceneObstacles";
 import { SprinklerPlacementPreview } from "./SprinklerPlacementPreview";
 import { SprinklerLayer } from "./sprinklerRendering";
@@ -69,9 +69,6 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private toolInput!: FarmToolInput;
 	private readonly hud = new FarmSceneHud((snapshot) =>
 		this.onFarmUpdate?.(snapshot),
-	);
-	private readonly landHint = new LandBorderHint((text) =>
-		this.hud.report(text),
 	);
 	private deactivated = false;
 	private readonly travel: FarmTravel;
@@ -195,7 +192,6 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	}
 
 	override onPreUpdate(engine: ex.Engine, _delta: number): void {
-		if (this.backgroundColor) engine.backgroundColor = this.backgroundColor;
 		const step = this.frameClock.step();
 		const selected = selectedFarmItem();
 		const blocked = isInventoryBlockingInput();
@@ -247,7 +243,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			step,
 			this.combo.moveSpeed,
 			farm?.land_level ?? 0,
-			this.landHint,
+			this.hud.landBorderHint,
 		);
 		followFarmPlayer(this.camera, this.player.pos, farm?.land_level ?? 0, engine);
 		publishViewTransform(engine, this.camera);

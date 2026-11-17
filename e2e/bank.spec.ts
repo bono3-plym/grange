@@ -48,7 +48,7 @@ test("the final land parcel is walkable and farmable to the map border", async (
 	// Before buying land, pressing into the owned edge points at the mayor.
 	// Walk to the top border deterministically; a fixed key hold is too short
 	// on a loaded CI runner.
-	await movePlayerNear(page, 576, 32, 4, { reach: 0 });
+	await movePlayerNear(page, 576, 32, 4, { reach: 0, timeout: 30_000 });
 	await page.keyboard.down("w");
 	try {
 		await expect(page.getByTestId("notification-feed")).toContainText(
@@ -78,7 +78,10 @@ test("the final land parcel is walkable and farmable to the map border", async (
 	// The expanded north-west land accepts walking. Walk deterministically to
 	// the top edge, then hold left until the player crosses x = 0. A single
 	// fixed burst covers less ground on a loaded CI runner.
-	await movePlayerNear(page, 576, -224, 8, { reach: 0 });
+	await movePlayerNear(page, 576, -224, 8, {
+		reach: 0,
+		timeout: 45_000,
+	});
 	await page.keyboard.down("a");
 	try {
 		await expect

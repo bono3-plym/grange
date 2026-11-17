@@ -8,6 +8,7 @@ import {
 } from "./farmHud";
 import { TOOL_HINTS } from "./farmTools";
 import { PlayerReach } from "./interaction";
+import { LandBorderHint } from "./landBorder";
 
 /**
  * Owns the farm scene's HUD text: the current hint, the hovered tile, the
@@ -20,8 +21,13 @@ export class FarmSceneHud {
 	private lastWorldPos: ex.Vector | null = null;
 	private player = { x: 0, y: 0 };
 	private readonly reach = new PlayerReach((message) => this.report(message));
+	private readonly landHint = new LandBorderHint((text) => this.report(text));
 
 	constructor(private readonly onUpdate: (snapshot: FarmHudSnapshot) => void) {}
+
+	get landBorderHint(): LandBorderHint {
+		return this.landHint;
+	}
 
 	setTool(tool: FarmToolId | null): void {
 		this.report(tool ? TOOL_HINTS[tool] : "Select a tool or item first.");
