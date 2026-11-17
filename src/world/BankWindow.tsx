@@ -98,7 +98,7 @@ export function BankWindow({ desk, isOwner, onClose }: Props) {
 		</> : <>
 			<p>{price === undefined ? "You own all available parcels." :
 				`Next parcel: $${price} · ${landLevel + 1} of ${LAND_PRICES.length}`}</p>
-			<p>Each purchase expands the farm by two tiles along its north or side edge.</p>
+			<p>Each purchase expands the farm outward. The last parcel reaches the full map border.</p>
 			<button type="button" disabled={busy || !isOwner || price === undefined || wallet < price}
 				onClick={() => void submit("land")}>Buy land</button>
 		</>}

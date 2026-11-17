@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { MAP_HEIGHT, MAP_WIDTH } from "../src/world/mapData";
 import {
 	BASE,
 	expectArea,
@@ -17,8 +18,7 @@ import {
 
 test("every world area loads without asset or page errors", async ({
 	page,
-}) => {
-	const pageErrors: string[] = [];
+}) => {	const pageErrors: string[] = [];
 	const failedAssets: string[] = [];
 
 	page.on("pageerror", (error) => {
@@ -58,6 +58,31 @@ test("every world area loads without asset or page errors", async ({
 
 	expect(pageErrors).toEqual([]);
 	expect(failedAssets).toEqual([]);
+});
+
+test("the canvas fills a widescreen browser with no letterboxing", async ({
+	page,
+}) => {
+	// The farm map is 3:2; a 16:10 window reveals scenic side land instead of
+	// shrinking the canvas back to 3:2 with page-colored bars.
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await registerFast(page, uniqueName("Wide"));
+	const canvas = page.locator("canvas.farm-map-canvas");
+	const box = await canvas.boundingBox();
+	expect(box).not.toBeNull();
+	if (!box) throw new Error("the world canvas is not laid out");
+	expect(Math.round(box.width)).toBe(1440);
+	expect(Math.round(box.height)).toBe(900);
+
+	const view = await canvas.evaluate((el) => {
+		const data = (el as HTMLCanvasElement).dataset;
+		return {
+			width: Number(data.viewWidth),
+			height: Number(data.viewHeight),
+		};
+	});
+	expect(view.width).toBeGreaterThan(MAP_WIDTH);
+	expect(view.height).toBeCloseTo(MAP_HEIGHT);
 });
 
 test("the market stalls open their buy and sell views", async ({ page }) => {

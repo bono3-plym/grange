@@ -453,7 +453,10 @@ The marketplace and casino are **hub areas**: a `WalkingScene` with `hubArea`
 joins `hub:<area>` on activate, leaves on deactivate, and publishes the local
 position at ~10 Hz while moving. `HubPlayers` renders the other players from
 `getHubPeers()`, easing them toward their reported positions with usernames
-above their heads.
+above their heads. The marketplace world is deliberately larger than the old
+hub canvas (`MARKETPLACE_MIN_COLUMN/ROW = -8`, max column 31 / row 11) to leave
+construction space above and on both sides; `WorldPosition.clamp_hub/3` clamps
+its presence to those bounds, while the casino keeps the original 18x12 map.
 
 Farms are not hubs, but they have their own `farm:<owner>` presence:
 `FarmScenePresence` publishes the local position and renders the other people
@@ -705,12 +708,18 @@ It arrives in the `farm:<owner>` join reply (owner only) and in every
 
 - World size: `MAP_COLUMNS = 18`, `MAP_ROWS = 12`, `TILE_SIZE = 64`,
   `MAP_WIDTH = 1152`, `MAP_HEIGHT = 768`.
+- The farm world is larger than the hub canvas: `FARM_WORLD_MIN_COLUMN = -6`,
+  `FARM_WORLD_MAX_COLUMN = 24`, `FARM_WORLD_MIN_ROW = -4`,
+  `FARM_WORLD_MAX_ROW = 11` (31x16 tiles). `farmBounds(land_level)` controls
+  how much is owned/walkable; the fifth and final bank parcel unlocks the full
+  border. Keep `LAND_PRICES` and the Elixir `Grange.Land` bounds/prices in sync.
 - Farm actions are addressed by **map tile coordinates** `(column, row)`, not
-  field-local coordinates. The server accepts `x`/`y` in `0..14` for crop
-  actions (`Farm.in_bounds?/2`), even though the rendered field is a smaller
-  patch around columns 7–11 and rows 6–8.
-- Fences/gates use map coordinates with `x in 0..17` and `y in 0..9`; rows
-  10–11 are the river/shore.
+  field-local coordinates. Crop actions are valid across the full farm world
+  (`-6..24` columns, `-4..9` rows) but require ownership of the tile; the
+  original field around columns 7-11 and rows 6-8 is only where the starter
+  props leave open ground.
+- Fences/gates use map coordinates with `x in -6..25` and `y in -4..10`, clipped
+  by the current land bounds; rows 10–11 are the river/shore.
 - `FIELD_GRID` / `worldToFieldTile()` / `fieldTileToWorld()` exist but the live
   action path uses `Math.floor(worldX / TILE_SIZE)` directly. Do not assume
   actions are field-relative.
@@ -971,6 +980,14 @@ into the inventory. See `notes/npc-tutorial.md`.
   the scene-specific resource module) and to that scene's group in
   `worldAssets.ts`, or the image renders blank on the first visit.
 - Use `TILE_SIZE`/`MAP_*` constants; do not hard-code 64/1152/768.
+- The canvas fills the browser (`DisplayMode.FitContainerAndFill`), so the
+  visible world is wider than `MAP_WIDTH` on a widescreen. Outdoor scenes
+  reveal scenic terrain and keep the map centred; indoor rooms stay at the
+  original 1:1 camera zoom and show their own backdrop in the side gutters, so
+  walking and train animation speed match the pre-widescreen game. Camera
+  clamping goes through `cameraAxis()` in `src/world/viewport.ts`. Scenes
+  publish their live camera box as `data-view-*` attributes on the canvas
+  (`publishViewTransform`), and the e2e world-to-page helpers read them.
 - Use `BlockRegistry`, `walkCollisions`, and `sceneObstacles` instead of ad-hoc
   collision checks.
 - Preserve `data-world-ready="true"`, the canvas `aria-label`
@@ -1062,11 +1079,14 @@ reason (the repo already has one for a deliberate hook dependency).
   not pay for a farm → marketplace → casino walk. Valid areas are
   `farm-map`, `marketplace`, `casino`, `livestock-market`, `bank`
   (`requestedStartArea()` in `src/world/testMode.ts`).
-- The hooks are gated to dev/test: `PageController` injects
-  `<meta name="grange-test-routes" content="true">` only when
-  `enable_test_routes` is on (the same flag as `/api/reset`), and
-  `testMode.ts` reads it. Production never injects it, so `?area=` is ignored
-  and walking speed is normal.
+- The hooks are split into two dev-only tags. `PageController` injects
+  `<meta name="grange-test-routes" content="true">` whenever
+  `enable_test_routes` is on (the same flag as `/api/reset`), which enables
+  `?area=` deep links. A second `<meta name="grange-e2e" content="true">` is
+  injected only when the server also has `GRANGE_E2E=1` (set by
+  `playwright.config.ts`); `testMode.ts` gates `WALK_SPEED_MULTIPLIER` and
+  `e2eMs()` on that tag, so ordinary dev play keeps normal walking and
+  animation speed. Production injects neither tag.
 - `webServer.env` in `playwright.config.ts` runs the suite on a fast clock,
   all of it e2e-only:
   - `GRANGE_GROW_MS=100` → `Farm.grow_ms/0`: a crop ripens in 100ms, not 10s.

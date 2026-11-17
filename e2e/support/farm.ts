@@ -1,25 +1,72 @@
 import { expect, type Page } from "@playwright/test";
 import { MAX_INTERACTION_DISTANCE } from "../../src/world/interaction";
-import { MAP_COLUMNS, MAP_ROWS, TILE_SIZE } from "../../src/world/mapData";
+import {
+	MAP_HEIGHT,
+	MAP_WIDTH,
+	TILE_SIZE,
+} from "../../src/world/mapData";
 
 /**
- * The page-space center of a world point, given in map pixels.
+ * The page-space position of a world point.
  *
- * Excalibur's FitContainer keeps the canvas at the map's aspect ratio, so a
- * world coordinate is a simple fraction of the canvas box.
+ * The canvas fills the browser, so the visible world is wider (or taller)
+ * than the map: Excalibur keeps the map's height and widens the resolution to
+ * the browser aspect. The farm camera is centred on the map, so convert world
+ * pixels through the visible-area origin and scale.
  */
+async function worldToPage(
+	page: Page,
+	worldX: number,
+	worldY: number,
+): Promise<{ x: number; y: number }> {
+	const canvas = page.locator(".farm-map-canvas");
+	const box = await canvas.boundingBox();
+	expect(box).not.toBeNull();
+	if (!box) throw new Error("the world canvas is not laid out");
+	const view = await canvas.evaluate((el) => {
+		const { viewLeft, viewTop, viewWidth, viewHeight } = (
+			el as HTMLCanvasElement
+		).dataset;
+		return {
+			left: Number(viewLeft),
+			top: Number(viewTop),
+			width: Number(viewWidth),
+			height: Number(viewHeight),
+		};
+	});
+	// Fall back to a centred map if the scene has not published its camera yet.
+	const aspect = box.width / box.height;
+	const mapAspect = MAP_WIDTH / MAP_HEIGHT;
+	const fallbackWidth = aspect >= mapAspect ? MAP_HEIGHT * aspect : MAP_WIDTH;
+	const fallbackHeight = aspect >= mapAspect ? MAP_HEIGHT : MAP_WIDTH / aspect;
+	const viewWidth =
+		Number.isFinite(view.width) && view.width > 0
+			? view.width
+			: fallbackWidth;
+	const viewHeight =
+		Number.isFinite(view.height) && view.height > 0
+			? view.height
+			: fallbackHeight;
+	const left = Number.isFinite(view.left)
+		? view.left
+		: (MAP_WIDTH - viewWidth) / 2;
+	const top = Number.isFinite(view.top)
+		? view.top
+		: (MAP_HEIGHT - viewHeight) / 2;
+	const scale = box.width / viewWidth;
+	return {
+		x: box.x + (worldX - left) * scale,
+		y: box.y + (worldY - top) * (box.height / viewHeight),
+	};
+}
+
+/** The page-space center of a world point, given in map pixels. */
 export async function worldPoint(
 	page: Page,
 	worldX: number,
 	worldY: number,
 ): Promise<{ x: number; y: number }> {
-	const box = await page.locator(".farm-map-canvas").boundingBox();
-	expect(box).not.toBeNull();
-	if (!box) throw new Error("the world canvas is not laid out");
-	return {
-		x: box.x + (worldX / 1152) * box.width,
-		y: box.y + (worldY / 768) * box.height,
-	};
+	return worldToPage(page, worldX, worldY);
 }
 
 /** Clicks a point given in world pixels. */
@@ -34,22 +81,20 @@ export async function clickWorld(
 
 /**
  * The page-space center of a farm map tile (0-based map coordinates).
- * `MAP_COLUMNS`/`MAP_ROWS` come from the same data the game renders with, so
- * the click math can't drift away from the real grid when tiles are redrawn or
- * the layout is restyled.
+ * `TILE_SIZE` and the map dimensions come from the same data the game renders
+ * with, so the click math can't drift away from the real grid when tiles are
+ * redrawn or the layout is restyled.
  */
 export async function farmTilePosition(
 	page: Page,
 	column: number,
 	row: number,
 ): Promise<{ x: number; y: number }> {
-	const box = await page.locator("canvas.farm-map-canvas").boundingBox();
-	expect(box).not.toBeNull();
-	if (!box) throw new Error("the world canvas is not laid out");
-	return {
-		x: box.x + ((column + 0.5) / MAP_COLUMNS) * box.width,
-		y: box.y + ((row + 0.5) / MAP_ROWS) * box.height,
-	};
+	return worldToPage(
+		page,
+		(column + 0.5) * TILE_SIZE,
+		(row + 0.5) * TILE_SIZE,
+	);
 }
 
 /** Moves the pointer over the center of a farm map tile. */

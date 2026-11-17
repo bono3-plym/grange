@@ -291,12 +291,12 @@ defmodule GrangeWeb.FarmChannelTest do
     assert {:ok, _reply, _bob} = join_farm("Bob", "Alice")
     assert Map.has_key?(Presence.list("farm:Alice"), "Bob")
 
-    assert_reply(push(socket, "move", %{"x" => -50, "y" => 5000}), :ok)
+    assert_reply(push(socket, "move", %{"x" => -5000, "y" => 5000}), :ok)
 
     meta =
       Presence.get_by_key("farm:Alice", "Alice") |> then(&Enum.max_by(&1.metas, fn m -> m.at end))
 
-    assert meta.x == 16
+    assert meta.x == -368
     assert meta.y == 752
 
     ref = push(socket, "move", %{"x" => 20, "y" => 20})

@@ -135,7 +135,7 @@ defmodule GrangeWeb.FarmChannel do
     with %{username: username} <- user,
          true <- is_binary(owner),
          true <- throttle_open?(socket.assigns[:last_move_at], now),
-         {:ok, {px, py}} <- WorldPosition.clamp(x, y) do
+         {:ok, {px, py}} <- WorldPosition.clamp_farm(x, y) do
       track(username, owner, px, py)
       {:reply, :ok, assign(socket, :last_move_at, now)}
     else
