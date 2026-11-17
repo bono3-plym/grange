@@ -1147,12 +1147,13 @@ reason (the repo already has one for a deliberate hook dependency).
 - `pnpm test:e2e` runs `vite build` first. If you changed frontend code, do not
   run Playwright without rebuilding.
 - The suite runs `fullyParallel` with **2 workers by default**
-  (`workers: Number(process.env.E2E_WORKERS ?? 2)`); CI sets `E2E_WORKERS=3`
-  because the runner has 4 vCPUs. A faster local machine started at its own core
-  count just saturates the CPU and makes every walk slower than it is with two;
-  raise `E2E_WORKERS` to experiment. The per-test timeout is 90s (the longest
-  paths, like the casino, set their own larger budget; the heaviest farm specs
-  use `test.setTimeout(150_000)`).
+  (`workers: Number(process.env.E2E_WORKERS ?? 2)`), and CI pins `E2E_WORKERS=1`.
+  The larger farm/marketplace scenes saturate the 4-vCPU runner; even two
+  workers drop clicks/keys in movement-heavy specs. A faster local machine
+  started at its own core count just saturates the CPU and makes every walk
+  slower than it is with one. The per-test timeout is 90s (the longest paths,
+  like the casino, set their own larger budget; the heaviest farm specs use
+  `test.setTimeout(150_000)`, and farm multiplayer uses 240_000).
 
 ### 10.4 CI
 
@@ -1164,7 +1165,7 @@ reason (the repo already has one for a deliberate hook dependency).
 4. Install Chromium.
 5. `pnpm check` (lint, Vitest, ExUnit, build).
 6. `pnpm test:e2e:run` (Playwright only). `pnpm check` already ran `pnpm build`,
-   so the e2e step must not rebuild; CI also sets `E2E_WORKERS=3`.
+   so the e2e step must not rebuild; CI also sets `E2E_WORKERS=1`.
 
 The required status check name is **`test`**; renaming the job silently
 removes the required check from the ruleset. There is also a `secrets` job that

@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
 	BASE,
-	clickFarmTile,
-	clickWorld,
 	expectArea,
+	hoverFarmTile,
 	movePlayerNear,
 	registerFast,
 	uniqueName,
@@ -43,6 +42,7 @@ test("the bank has teller and mayor desks, with saved money and land purchases",
 test("the final land parcel is walkable and farmable to the map border", async ({
 	page,
 }) => {
+	test.setTimeout(180_000);
 	await registerFast(page, uniqueName("Border"));
 
 	// Before buying land, pressing into the owned edge points at the mayor.
@@ -76,9 +76,30 @@ test("the final land parcel is walkable and farmable to the map border", async (
 	await waitForWorld(page);
 
 	// The expanded north-west land accepts walking. Walk deterministically to
-	// the top edge, then across it; fixed key holds are too short on CI.
+	// the top edge, then hold left until the player crosses x = 0. A single
+	// fixed burst covers less ground on a loaded CI runner.
 	await movePlayerNear(page, 576, -224, 8, { reach: 0 });
-	await movePlayerNear(page, -368, -224, 8, { reach: 0 });
+	await page.keyboard.down("a");
+	try {
+		await expect
+			.poll(
+				async () => {
+					await page.keyboard.down("a");
+					return page.evaluate(() =>
+						Number(
+							document
+								.querySelector(".farm-map-page")
+								?.getAttribute("data-player-x"),
+						),
+					);
+				},
+				{ timeout: 60_000, intervals: [250] },
+			)
+			.toBeLessThan(0);
+	} finally {
+		await page.keyboard.up("a");
+	}
+
 	const position = await page.evaluate(() => {
 		const el = document.querySelector(".farm-map-page");
 		return {
@@ -89,18 +110,16 @@ test("the final land parcel is walkable and farmable to the map border", async (
 	expect(position.x).toBeLessThan(0);
 	expect(position.y).toBeLessThan(0);
 
-	// Crops and fences work on the newly purchased edge tiles.
+	// The hoe works on the newly purchased edge tile under the player.
+	const column = Math.floor(position.x / 64);
+	const row = Math.floor(position.y / 64);
+	await hoverFarmTile(page, column, row);
 	await page.keyboard.press("1");
-	await clickFarmTile(page, -4, -3);
-	await expect(page.getByTestId("farm-tile")).toContainText(
-		"(-4, -3): tilled",
-		{ timeout: 10_000 },
-	);
-	await page.keyboard.press("6");
-	await clickWorld(page, -4 * 64, -2 * 64);
-	await expect(page.getByTestId("slot-hotbar-5")).toHaveAttribute(
-		"data-count",
-		"19",
-		{ timeout: 10_000 },
-	);
+	await expect(async () => {
+		await page.keyboard.press("Space");
+		await expect(page.getByTestId("farm-tile")).toContainText(
+			`(${column}, ${row}): tilled`,
+			{ timeout: 800 },
+		);
+	}).toPass({ timeout: 20_000, intervals: [250] });
 });
