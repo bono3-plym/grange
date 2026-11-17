@@ -4,6 +4,7 @@ import {
 	clickFarmTile,
 	clickWorld,
 	expectArea,
+	movePlayerNear,
 	registerFast,
 	uniqueName,
 	useDoor,
@@ -45,13 +46,18 @@ test("the final land parcel is walkable and farmable to the map border", async (
 	await registerFast(page, uniqueName("Border"));
 
 	// Before buying land, pressing into the owned edge points at the mayor.
+	// Walk to the top border deterministically; a fixed key hold is too short
+	// on a loaded CI runner.
+	await movePlayerNear(page, 576, 32, 4, { reach: 0 });
 	await page.keyboard.down("w");
-	await page.waitForTimeout(1_800);
-	await page.keyboard.up("w");
-	await expect(page.getByTestId("notification-feed")).toContainText(
-		"Talk with the Mayor to purchase more land.",
-		{ timeout: 5_000 },
-	);
+	try {
+		await expect(page.getByTestId("notification-feed")).toContainText(
+			"Talk with the Mayor to purchase more land.",
+			{ timeout: 10_000 },
+		);
+	} finally {
+		await page.keyboard.up("w");
+	}
 
 	await page.request.post(`${BASE}/api/economy/transaction`, {
 		data: { delta: 10_000 },
