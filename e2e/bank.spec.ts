@@ -22,7 +22,7 @@ test("the bank has teller and mayor desks, with saved money and land purchases",
 	await useDoor(page);
 	await expectArea(page, /^Bank map/, 10_000);
 
-	await walkUntilPrompt(page, ["w", "a"], "talk to bank teller", 15_000);
+	await walkUntilPrompt(page, ["w", "a"], "talk to bank teller", 30_000);
 	await useDoor(page);
 	const teller = page.getByRole("dialog", { name: "Talk to bank teller" });
 	await expect(teller).toBeVisible();
@@ -33,7 +33,7 @@ test("the bank has teller and mayor desks, with saved money and land purchases",
 	await expect(teller).toContainText("Savings: $0");
 	await page.keyboard.press("Escape");
 
-	await walkUntilPrompt(page, ["d"], "talk to mayor", 15_000);
+	await walkUntilPrompt(page, ["d"], "talk to mayor", 30_000);
 	await useDoor(page);
 	const mayor = page.getByRole("dialog", { name: "Talk to mayor" });
 	await expect(mayor).toContainText("Next parcel: $250");
@@ -75,13 +75,10 @@ test("the final land parcel is walkable and farmable to the map border", async (
 	await page.reload();
 	await waitForWorld(page);
 
-	// The expanded north-west land accepts walking.
-	await page.keyboard.down("w");
-	await page.waitForTimeout(2_200);
-	await page.keyboard.up("w");
-	await page.keyboard.down("a");
-	await page.waitForTimeout(2_400);
-	await page.keyboard.up("a");
+	// The expanded north-west land accepts walking. Walk deterministically to
+	// the top edge, then across it; fixed key holds are too short on CI.
+	await movePlayerNear(page, 576, -224, 8, { reach: 0 });
+	await movePlayerNear(page, -368, -224, 8, { reach: 0 });
 	const position = await page.evaluate(() => {
 		const el = document.querySelector(".farm-map-page");
 		return {
