@@ -25,6 +25,7 @@ export interface FarmInteractionArgs {
 	npc?: FarmNpc;
 	onTalkToNpc: () => void;
 	onOpenHouse: () => void;
+	onOpenBrewery: () => void;
 	report: (text: string) => void;
 }
 
@@ -33,6 +34,7 @@ export function updateFarmInteractions(args: FarmInteractionArgs): void {
 	const gate = nearbyGate(args.farm?.gates ?? [], args.player.pos);
 	const house = args.farmProps.position("farmhouse");
 	const npc = shouldShowNpc(args.isOwner) ? npcAnchor(house) : null;
+	const brewery = args.isOwner ? args.farmProps.position("brewery") : null;
 	args.npc?.place(npc);
 	args.travel.update(
 		args.player,
@@ -43,6 +45,8 @@ export function updateFarmInteractions(args: FarmInteractionArgs): void {
 		args.onTalkToNpc,
 		args.travel.housePrompt(args.isOwner, args.player.pos, house),
 		args.onOpenHouse,
+		brewery,
+		args.onOpenBrewery,
 	);
 	if (gate && args.input.consumePress("KeyE", "Enter")) {
 		toggleGate(args.owner, gate.gate, args.report);

@@ -8,6 +8,7 @@ export type MarketplacePropKey =
 	| "livestock-pavilion"
 	| "village-bank"
 	| "hardware-store"
+	| "realtor"
 	| "seed-display"
 	| "produce-cart"
 	| "notice-board"
@@ -28,6 +29,7 @@ export const MARKETPLACE_PRODUCE_MARKET_ENTRANCE = { x: 575, y: 350 } as const;
 export const MARKETPLACE_LIVESTOCK_ENTRANCE = { x: 650, y: 575 } as const;
 export const MARKETPLACE_BANK_ENTRANCE = { x: 1310, y: 570 } as const;
 export const MARKETPLACE_HARDWARE_ENTRANCE = { x: 1230, y: 355 } as const;
+export const MARKETPLACE_REALTOR_ENTRANCE = { x: 1664, y: 355 } as const;
 /**
  * Wide enough to leave open plots beyond the current stalls for future
  * buildings. The world extends left and above the original 24x12 map too, so
@@ -50,12 +52,22 @@ export const MARKETPLACE_MIN_Y = MARKETPLACE_MIN_ROW * 64;
 export function marketplaceTerrainAt(column: number, row: number): TerrainKey {
 	if (
 		(row === 5 || row === 9) &&
-		(column === 4 || column === 9 || column === 14 || column === 20)
+		(column === 4 ||
+			column === 9 ||
+			column === 14 ||
+			column === 20 ||
+			column === 26)
 	) {
 		return "path-cross";
 	}
 	if (row === 5 || row === 9) return "path-horizontal";
-	if (column === 4 || column === 9 || column === 14 || column === 20) {
+	if (
+		column === 4 ||
+		column === 9 ||
+		column === 14 ||
+		column === 20 ||
+		column === 26
+	) {
 		return "path-vertical";
 	}
 	if ((column * 5 + row * 7) % 17 === 0) return "grass-flowers";
@@ -72,6 +84,8 @@ export const marketplaceProps: RenderedProp<MarketplacePropKey>[] = [
 	{ asset: "livestock-pavilion", x: 650, y: 545, width: 295 },
 	{ asset: "village-bank", x: 1310, y: 545, width: 250 },
 	{ asset: "hardware-store", x: 1230, y: 300, width: 220 },
+	{ asset: "realtor", x: 1664, y: 300, width: 250 },
+	{ asset: "notice-board", x: 1500, y: 470, width: 86 },
 	{ asset: "signpost", x: 660, y: 685, width: 88 },
 	{ asset: "starter-train", x: 935, y: 735, width: 390 },
 	{ asset: "oak-tree", x: 60, y: 205, width: 105 },

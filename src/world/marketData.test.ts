@@ -95,11 +95,20 @@ describe("market definitions", () => {
 
 	it("offers the sprinkler at the hardware store", () => {
 		expect(MARKETS.hardware.categories).toEqual([
+			"materials",
 			"equipment",
 			"build",
 			"supplies",
 		]);
-		expect(MARKETS.hardware.defaultCategory).toBe("equipment");
+		expect(MARKETS.hardware.defaultCategory).toBe("materials");
+		expect(MARKET_CATEGORIES.materials.items).toEqual([
+			"wood-plank",
+			"stone",
+			"nails",
+		]);
+		expect(MARKET_ITEMS["wood-plank"].price).toBe(20);
+		expect(MARKET_ITEMS.stone.price).toBe(15);
+		expect(MARKET_ITEMS.nails.price).toBe(5);
 		expect(MARKET_CATEGORIES.supplies.items).toEqual(["sprinkler"]);
 		expect(MARKET_CATEGORIES.equipment.items).toEqual([
 			"hoe",

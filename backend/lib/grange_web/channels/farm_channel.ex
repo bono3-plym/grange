@@ -15,8 +15,10 @@ defmodule GrangeWeb.FarmChannel do
 
   alias Grange.{
     BarnStorage,
+    Brewing,
     FarmGateActions,
     FarmPresence,
+    FarmProps,
     FarmSettings,
     FarmStore,
     Inventory,
@@ -112,7 +114,16 @@ defmodule GrangeWeb.FarmChannel do
 
   @impl true
   def handle_in("farmPropAction", %{"action" => action}, socket) do
-    authorize_prop(socket, fn owner -> prop_act(socket, owner, action) end)
+    if FarmProps.owner_only?(action) do
+      authorize_owner(socket, fn owner -> prop_act(socket, owner, action) end)
+    else
+      authorize_prop(socket, fn owner -> prop_act(socket, owner, action) end)
+    end
+  end
+
+  @impl true
+  def handle_in("breweryAction", %{"action" => action}, socket) do
+    authorize_owner(socket, fn owner -> brewery_act(socket, owner, action) end)
   end
 
   @impl true
@@ -279,6 +290,17 @@ defmodule GrangeWeb.FarmChannel do
     case FarmStore.prop_action(owner, action) do
       {:ok, _farm} -> {:reply, :ok, socket}
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
+
+  defp brewery_act(socket, owner, action) do
+    case Brewing.action(owner, action) do
+      {:ok, result} ->
+        FarmStore.refresh(owner)
+        {:reply, {:ok, result}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{error: reason}}, socket}
     end
   end
 

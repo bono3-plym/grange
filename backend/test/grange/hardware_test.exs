@@ -49,6 +49,23 @@ defmodule Grange.HardwareTest do
     assert FarmStore.view("Builder").gate_count == 4
   end
 
+  test "building materials are priced and added to the item ledger" do
+    user = user("Mason")
+
+    assert Hardware.price("wood-plank") == 20
+    assert Hardware.price("stone") == 15
+    assert Hardware.price("nails") == 5
+
+    assert {:ok, result} = Hardware.buy(user, "wood-plank", 2)
+    assert result.balance == 60
+    assert result.count == 2
+    assert Grange.Inventory.holdings("Mason")["wood-plank"] == 2
+
+    assert {:ok, result} = Hardware.buy(user, "nails", 4)
+    assert result.balance == 40
+    assert result.count == 4
+  end
+
   test "unknown and invalid purchases are rejected" do
     user = user("Shopper")
 

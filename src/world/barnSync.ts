@@ -1,5 +1,16 @@
-import { CROPS, type CropId } from "../../shared/crops";
 import { CROP_ITEMS, type ItemId } from "../inventory/items";
+
+/** Barn keys that are not crops but still mirror into the player inventory. */
+const BREW_OUTPUT_ITEMS: Record<string, ItemId> = {
+	beer: "beer",
+	tomato_juice: "tomato_juice",
+	lettuce_juice: "lettuce_juice",
+};
+
+const BARN_ITEMS: Record<string, ItemId> = {
+	...CROP_ITEMS,
+	...BREW_OUTPUT_ITEMS,
+};
 
 /** Inventory primitives the reconciler needs, injected for testability. */
 export interface BarnReconcileActions {
@@ -19,10 +30,8 @@ export function reconcileBarn(
 	barn: Record<string, number>,
 	actions: BarnReconcileActions,
 ): void {
-	for (const cropId of Object.keys(CROPS) as CropId[]) {
-		const itemId = CROP_ITEMS[cropId];
-		if (!itemId) continue;
-		const desired = barn[cropId] ?? 0;
+	for (const [barnKey, itemId] of Object.entries(BARN_ITEMS)) {
+		const desired = barn[barnKey] ?? 0;
 		const actual = actions.countItem(itemId);
 		if (desired > actual) actions.addItem(itemId, desired - actual);
 		else if (desired < actual) actions.removeItem(itemId, actual - desired);

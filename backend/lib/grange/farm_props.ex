@@ -24,7 +24,51 @@ defmodule Grange.FarmProps do
     16 => {"daisies", 50}
   }
 
+  # Properties bought from the realtor get their own source index so they can
+  # share the same dig/place flow as starter props without colliding with one.
+  @purchasable %{"brewery" => {100, 250}}
+  @brewery_index 100
+
   def asset(index), do: @assets[index]
+
+  @doc "True when a prop action must stay with the farm owner."
+  @spec owner_only?(map()) :: boolean()
+  def owner_only?(action) when is_map(action) do
+    fetch(action, "asset") == "brewery" or fetch(action, "index") == @brewery_index
+  end
+
+  def owner_only?(_action), do: false
+
+  @doc "Gives the owner a purchased placeable item, carried in their inventory."
+  @spec grant(String.t(), String.t()) :: :ok | {:error, String.t()}
+  def grant(owner, asset) do
+    case Map.fetch(@purchasable, asset) do
+      {:ok, {index, _width}} -> grant_index(owner, index, asset)
+      :error -> {:error, "unknown property"}
+    end
+  end
+
+  defp grant_index(owner, index, asset) do
+    case Repo.one(from(p in FarmProp, where: p.owner == ^owner and p.source_index == ^index)) do
+      nil ->
+        Repo.insert!(%FarmProp{
+          owner: owner,
+          source_index: index,
+          asset: asset,
+          x: 0,
+          y: 0,
+          carried: true
+        })
+
+        :ok
+
+      %{carried: true} ->
+        :ok
+
+      _placed ->
+        {:error, "property is already placed"}
+    end
+  end
 
   def overrides(owner) do
     Repo.all(from(p in FarmProp, where: p.owner == ^owner, order_by: p.source_index))
@@ -40,12 +84,32 @@ defmodule Grange.FarmProps do
 
   def dig(owner, index) when is_integer(index) do
     case @assets[index] do
-      nil -> {:error, "that object cannot be dug up"}
+      nil -> dig_purchased(owner, index)
       {asset, _width} -> dig_known(owner, index, asset)
     end
   end
 
   def dig(_owner, _index), do: {:error, "invalid object"}
+
+  defp dig_purchased(owner, @brewery_index) do
+    case Repo.one(
+           from(p in FarmProp,
+             where: p.owner == ^owner and p.source_index == @brewery_index
+           )
+         ) do
+      nil ->
+        {:error, "that object cannot be dug up"}
+
+      %{carried: true} ->
+        {:error, "object is already in inventory"}
+
+      prop ->
+        prop |> Ecto.Changeset.change(carried: true) |> Repo.update!()
+        :ok
+    end
+  end
+
+  defp dig_purchased(_owner, _index), do: {:error, "that object cannot be dug up"}
 
   def place(owner, asset, x, y) when is_binary(asset) and is_integer(x) and is_integer(y) do
     with {:ok, width} <- place_width(asset),
@@ -102,8 +166,14 @@ defmodule Grange.FarmProps do
 
   defp place_width(asset) do
     case Enum.find(@assets, fn {_index, {name, _width}} -> name == asset end) do
-      nil -> :error
-      {_index, {_name, width}} -> {:ok, width}
+      nil ->
+        case Map.fetch(@purchasable, asset) do
+          {:ok, {_index, width}} -> {:ok, width}
+          :error -> :error
+        end
+
+      {_index, {_name, width}} ->
+        {:ok, width}
     end
   end
 

@@ -12,6 +12,7 @@ import {
 export const farmFootprints: Partial<Record<PropKey, PropFootprint>> = {
 	farmhouse: { width: 0.9, depth: 130 },
 	barn: { width: 0.9, depth: 135 },
+	brewery: { width: 0.9, depth: 120 },
 	"oak-tree": { width: 0.38, depth: 27 },
 	"pine-tree": { width: 0.35, depth: 25 },
 	"apple-tree": { width: 0.38, depth: 27 },
@@ -40,6 +41,7 @@ const marketplaceFootprints: Partial<
 	"livestock-pavilion": { width: 0.8, depth: 68 },
 	"village-bank": { width: 0.86, depth: 78 },
 	"hardware-store": { width: 0.9, depth: 88 },
+	realtor: { width: 0.9, depth: 92 },
 	"seed-display": { width: 0.85, depth: 45 },
 	"produce-cart": { width: 0.85, depth: 55 },
 	"notice-board": { width: 0.75, depth: 35 },

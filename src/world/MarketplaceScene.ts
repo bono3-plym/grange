@@ -6,6 +6,7 @@ import {
 	MARKETPLACE_LIVESTOCK_ENTRANCE,
 	MARKETPLACE_BANK_ENTRANCE,
 	MARKETPLACE_HARDWARE_ENTRANCE,
+	MARKETPLACE_REALTOR_ENTRANCE,
 	MARKETPLACE_COLUMNS,
 	MARKETPLACE_MIN_COLUMN,
 	MARKETPLACE_MIN_ROW,
@@ -37,6 +38,7 @@ export class MarketplaceScene extends WalkingScene {
 		onAreaChange: (area: WorldArea) => void,
 		onOpenMarket: (market: MarketId) => void,
 		onOpenTravel: () => void,
+		onOpenRealtor: () => void,
 	) {
 		super({
 			area: "Marketplace",
@@ -67,6 +69,15 @@ export class MarketplaceScene extends WalkingScene {
 					prompt: "Press E or Enter to shop at the hardware store",
 					radius: 95,
 					action: () => onOpenMarket("hardware"),
+				},
+				{
+					position: ex.vec(
+						MARKETPLACE_REALTOR_ENTRANCE.x,
+						MARKETPLACE_REALTOR_ENTRANCE.y,
+					),
+					prompt: "Press E or Enter to visit the realtor",
+					radius: 90,
+					action: onOpenRealtor,
 				},
 				{
 					position: ex.vec(

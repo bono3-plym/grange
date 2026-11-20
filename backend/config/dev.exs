@@ -17,6 +17,11 @@ config :grange, grow_ms: String.to_integer(System.get_env("GRANGE_GROW_MS") || "
 config :grange,
   tick_ms: String.to_integer(System.get_env("GRANGE_TICK_MS") || "1000")
 
+# A brewery batch takes one hour in normal play. E2E shortens it so a spec can
+# watch the timer finish on the next sweep.
+config :grange,
+  brew_ms: String.to_integer(System.get_env("GRANGE_BREW_MS") || "3600000")
+
 # Playwright registers an account per test; the production Argon2 cost makes
 # those registrations a measurable part of the suite. E2E opts into the same
 # cheap parameters the ExUnit suite uses. Normal dev keeps the real cost.

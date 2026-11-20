@@ -55,6 +55,15 @@ describe("reconcileBarn", () => {
 		expect(inv.calls).toEqual([]);
 	});
 
+	it("mirrors brewery drinks from the barn", () => {
+		const inv = fakeInventory();
+		reconcileBarn({ beer: 2, tomato_juice: 1 }, inv.actions);
+		expect(inv.calls).toEqual([
+			["add", "beer", 2],
+			["add", "tomato_juice", 1],
+		]);
+	});
+
 	it("ignores unknown barn keys", () => {
 		const inv = fakeInventory();
 		reconcileBarn({ not_a_crop: 5 }, inv.actions);

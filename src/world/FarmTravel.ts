@@ -1,4 +1,5 @@
 import type * as ex from "excalibur";
+import { withinBreweryReach } from "./breweryData";
 import type { InputManager } from "./InputManager";
 import { FARM_HOUSE_REACH, isNearFarmTrain } from "./mapData";
 import type { TrainController } from "./train";
@@ -49,6 +50,8 @@ export class FarmTravel {
 		onTalkToNpc: (() => void) | null = null,
 		housePrompt: string | null = null,
 		onOpenHouse: (() => void) | null = null,
+		breweryPosition: ScenePosition | null = null,
+		onOpenBrewery: (() => void) | null = null,
 	): void {
 		// A nearby gate owns the prompt and the E key while it is in range.
 		if (gatePrompt) {
@@ -65,6 +68,15 @@ export class FarmTravel {
 		if (housePrompt && onOpenHouse) {
 			this.setPrompt(housePrompt);
 			if (input.consumePress("KeyE", "Enter")) onOpenHouse();
+			return;
+		}
+		if (
+			breweryPosition &&
+			onOpenBrewery &&
+			withinBreweryReach(player.pos, breweryPosition)
+		) {
+			this.setPrompt("Press E or Enter to open the brewery");
+			if (input.consumePress("KeyE", "Enter")) onOpenBrewery();
 			return;
 		}
 		const nearTrain = isNearFarmTrain(player.pos.x, player.pos.y);

@@ -10,6 +10,8 @@ import {
 } from "../world/fishingData";
 import type { MovablePropKey } from "../world/mapData";
 import type { AnimalId } from "../world/livestockData";
+import { BREW_ITEM_DEFS, type BrewItemId } from "./brewItems";
+import { MATERIAL_ITEM_DEFS, type MaterialItemId } from "./materialItems";
 
 export type ItemId =
 	| "hoe"
@@ -31,12 +33,14 @@ export type ItemId =
 	| "gate"
 	| "shovel"
 	| "sprinkler"
+	| MaterialItemId
+	| BrewItemId
 	| AnimalId
 	| RodId
 	| FishId
 	| MovablePropKey;
 
-export type ItemKind = "tool" | "seed" | "crop" | "fish" | "building" | "animal";
+export type ItemKind = "tool" | "seed" | "crop" | "fish" | "building" | "animal" | "material" | "drink";
 
 export interface ItemDef {
 	id: ItemId;
@@ -73,6 +77,8 @@ function fishItem(id: FishId): ItemDef {
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
+	...MATERIAL_ITEM_DEFS,
+	...BREW_ITEM_DEFS,
 	...(Object.fromEntries(
 		ROD_ORDER.map((id) => [id, rodItem(id)]),
 	) as Record<RodId, ItemDef>),
@@ -214,14 +220,10 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 	},
 	shovel: {
 		id: "shovel", name: "Shovel", kind: "tool", maxStack: 1,
-		icon: "/assets/farm/objects/shovel.svg",
-		description: "Click a fence or farm object to dig it up into inventory.",
+		icon: "/assets/farm/objects/shovel.svg", description: "Click a fence or farm object to dig it up into inventory.",
 	},
 	sprinkler: {
-		id: "sprinkler",
-		name: "Sprinkler",
-		kind: "building",
-		maxStack: 99,
+		id: "sprinkler", name: "Sprinkler", kind: "building", maxStack: 99,
 		icon: "/assets/farm/objects/sprinkler.webp",
 		description: "Place on a tile corner to keep the four surrounding tiles watered.",
 	},
@@ -241,6 +243,9 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 		icon: "/assets/farm/buildings/farmhouse.webp", description: "Place your farmhouse on clear ground." },
 	barn: { id: "barn", name: "Barn", kind: "building", maxStack: 99,
 		icon: "/assets/farm/buildings/barn.webp", description: "Place your barn on clear ground." },
+	brewery: { id: "brewery", name: "Brewery", kind: "building", maxStack: 1,
+		icon: "/assets/marketplace/realtor/brewery.png",
+		description: "Place on your home farm. Brewing comes later." },
 	well: { id: "well", name: "Well", kind: "building", maxStack: 99,
 		icon: "/assets/farm/objects/well.webp", description: "Place a well on clear ground." },
 	bench: { id: "bench", name: "Bench", kind: "building", maxStack: 99,

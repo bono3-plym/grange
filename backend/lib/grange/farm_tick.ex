@@ -11,12 +11,14 @@ defmodule Grange.FarmTick do
 
   import Ecto.Query
 
-  alias Grange.{Farm, FarmSprinklers, Repo, Tile}
+  alias Grange.{Brewing, Farm, FarmSprinklers, Repo, Tile}
 
   @spec run(integer()) :: [String.t()]
   def run(now) do
     sprinkled = FarmSprinklers.water_tick(now)
-    Enum.uniq(sprinkled ++ ripen(now) ++ revert_untended(now)) |> Enum.sort()
+
+    Enum.uniq(sprinkled ++ ripen(now) ++ revert_untended(now) ++ Brewing.finish_due(now))
+    |> Enum.sort()
   end
 
   defp ripen(now) do

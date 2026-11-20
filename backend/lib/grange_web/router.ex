@@ -38,6 +38,9 @@ defmodule GrangeWeb.Router do
 
     post("/hardware/buy", HardwareController, :buy)
 
+    get("/realtor", RealtorController, :index)
+    post("/realtor/build", RealtorController, :build)
+
     get("/state", HealthController, :state)
 
     # Test hooks: let e2e runs start from a clean slate, jump the farmhand

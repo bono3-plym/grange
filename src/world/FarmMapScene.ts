@@ -74,6 +74,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private readonly fishing: FarmFishing;
 	private readonly onOpenHouse: () => void;
 	private readonly onTalkToNpc: () => void;
+	private readonly onOpenBrewery: () => void;
 	private npc?: FarmNpc;
 	private train!: TrainController;
 	private presence?: FarmScenePresence;
@@ -89,11 +90,13 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		onFish: () => void,
 		onOpenHouse: () => void,
 		onTalkToNpc: () => void,
+		onOpenBrewery: () => void,
 		onOpenTravel: () => void,
 	) {
 		super();
 		this.onOpenHouse = onOpenHouse;
 		this.onTalkToNpc = onTalkToNpc;
+		this.onOpenBrewery = onOpenBrewery;
 		this.fishing = new FarmFishing(isOwner, onFish, (prompt) =>
 			onPromptChange(prompt),
 		);
@@ -269,6 +272,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			npc: this.npc,
 			onTalkToNpc: this.onTalkToNpc,
 			onOpenHouse: this.onOpenHouse,
+			onOpenBrewery: this.onOpenBrewery,
 			report: (message) => this.hud.report(message),
 		});
 

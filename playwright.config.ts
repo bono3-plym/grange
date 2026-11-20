@@ -40,6 +40,7 @@ export default defineConfig({
 			// speed.
 			GRANGE_GROW_MS: process.env.GRANGE_GROW_MS ?? "100",
 			GRANGE_TICK_MS: process.env.GRANGE_TICK_MS ?? "100",
+			GRANGE_BREW_MS: process.env.GRANGE_BREW_MS ?? "100",
 			// Argon2 is deliberately slow in dev; e2e registers ~50 accounts.
 			GRANGE_FAST_HASH: "1",
 			// Opt into the Playwright-only gameplay overrides (3x walking and

@@ -1,0 +1,207 @@
+.market-window.brewery-window {
+	width: min(56rem, 100%);
+}
+
+.brewery-body {
+	display: grid;
+	grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+	gap: 1rem;
+	align-items: stretch;
+}
+
+.brewery-showcase {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 20rem;
+	border: 3px solid #2b1709;
+	border-radius: 0.2rem;
+	background: radial-gradient(circle at 50% 35%, #fff8e3 0%, #e4c891 72%, #d3b377 100%);
+	overflow: hidden;
+}
+
+.brewery-art {
+	width: 92%;
+	max-height: 22rem;
+	object-fit: contain;
+}
+
+.brewery-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 0.7rem;
+	padding: 0.8rem;
+	border: 3px solid #2b1709;
+	border-radius: 0.2rem;
+	background: #d8c39e;
+	color: #2b1709;
+}
+
+.brewery-kicker {
+	margin: 0;
+	font-size: 0.68rem;
+	letter-spacing: 0.12em;
+	color: #8c3b2e;
+}
+
+.brewery-copy,
+.brewery-hint {
+	margin: 0;
+	font-family: system-ui, sans-serif;
+	font-size: 0.84rem;
+	line-height: 1.4;
+}
+
+.brewery-batch {
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+}
+
+.brewery-row {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.55rem;
+	border: 2px solid rgba(43, 23, 9, 0.3);
+	border-radius: 0.2rem;
+	background: #f4e6c5;
+	font-family: system-ui, sans-serif;
+	font-size: 0.92rem;
+}
+
+.brewery-row img {
+	width: 2rem;
+	height: 2rem;
+	object-fit: contain;
+	image-rendering: pixelated;
+}
+
+.brewery-timer {
+	margin: 0;
+	font-size: 2rem;
+	letter-spacing: 0.06em;
+	text-align: center;
+}
+
+.brewery-progress {
+	height: 0.8rem;
+	border: 2px solid #2b1709;
+	border-radius: 0.2rem;
+	background: #a98c63;
+	overflow: hidden;
+}
+
+.brewery-progress span {
+	display: block;
+	height: 100%;
+	background: linear-gradient(90deg, #d98b2b, #f0c040);
+	transition: width 0.25s linear;
+}
+
+.brewery-crops {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.45rem;
+}
+
+.brewery-crop {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.15rem;
+	padding: 0.4rem;
+	border: 2px solid rgba(43, 23, 9, 0.35);
+	border-radius: 0.2rem;
+	background: #f4e6c5;
+	color: #2b1709;
+	font-family: system-ui, sans-serif;
+	cursor: pointer;
+}
+
+.brewery-crop:hover:not(:disabled) {
+	border-color: #4f7a2a;
+	background: #e7f0d4;
+}
+
+.brewery-crop:disabled {
+	cursor: not-allowed;
+	opacity: 0.62;
+}
+
+.brewery-crop-rejected {
+	background: #e5cdbd;
+}
+
+.brewery-crop img {
+	width: 2rem;
+	height: 2rem;
+	object-fit: contain;
+	image-rendering: pixelated;
+}
+
+.brewery-crop-name {
+	font-weight: 700;
+	font-size: 0.78rem;
+	text-align: center;
+}
+
+.brewery-crop-stock,
+.brewery-crop-note {
+	font-size: 0.68rem;
+}
+
+.brewery-crop-note {
+	color: #6b4b32;
+}
+
+.brewery-actions {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.brewery-primary,
+.brewery-secondary {
+	flex: 1;
+	padding: 0.6rem 0.75rem;
+	border: 3px solid #2b1709;
+	border-radius: 0.2rem;
+	font-family: "Rye", serif;
+	font-size: 0.88rem;
+	cursor: pointer;
+}
+
+.brewery-primary {
+	background: #7cb342;
+	color: #17300a;
+}
+
+.brewery-secondary {
+	background: #d8c39e;
+	color: #2b1709;
+}
+
+.brewery-primary:disabled,
+.brewery-secondary:disabled {
+	cursor: wait;
+	opacity: 0.6;
+}
+
+.brewery-last {
+	margin: auto 0 0;
+	padding: 0.5rem;
+	border: 2px solid rgba(43, 23, 9, 0.3);
+	border-radius: 0.2rem;
+	background: #cfe3b4;
+	font-family: system-ui, sans-serif;
+	font-size: 0.82rem;
+}
+
+@media (max-width: 720px) {
+	.brewery-body {
+		grid-template-columns: 1fr;
+	}
+	.brewery-showcase {
+		min-height: 14rem;
+	}
+}

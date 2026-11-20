@@ -405,6 +405,25 @@
 	image-rendering: pixelated;
 }
 
+.market-quantity {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.68rem;
+	font-weight: 700;
+}
+
+.market-quantity input {
+	width: 3.4rem;
+	padding: 0.15rem 0.25rem;
+	border: 2px solid #2b1709;
+	border-radius: 0.2rem;
+	background: #f4e6c5;
+	color: #2b1709;
+	font: inherit;
+	text-align: center;
+}
+
 .market-generic-empty {
 	min-height: 5rem;
 	border: 3px solid rgba(43, 23, 9, 0.6);

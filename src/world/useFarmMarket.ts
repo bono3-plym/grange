@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { countItem, useInventoryStore } from "../inventory/inventoryStore";
 import type { ItemId } from "../inventory/items";
+import { MATERIAL_ITEMS } from "../inventory/materialItems";
 import { emitAddItem, emitRemoveItem } from "../socket";
 import { useGameStore } from "../store";
 import { emitSellProduce } from "./barnSocket";
@@ -23,6 +24,8 @@ const SEED_ITEMS: Record<string, ItemId> = {
 /** Hardware tools are one-off purchases; the rest restock the farm's supply. */
 const HARDWARE_TOOLS: ItemId[] = ["hoe", "watering-can", "scythe", "shovel"];
 const HARDWARE_STOCK: ItemId[] = ["fence", "gate", "sprinkler"];
+const HARDWARE_MATERIALS: ItemId[] = [...MATERIAL_ITEMS];
+const isMaterial = (id: ItemId): boolean => HARDWARE_MATERIALS.includes(id);
 
 /**
  * Market overlay state and controls for a farm visit. Seeds and produce follow
@@ -80,7 +83,8 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 	}
 
 	async function buyHardware(id: ItemId, quantity: number) {
-		if (!isOwner || quantity < 1) return;
+		// Materials are account-level, so they can be bought while visiting.
+		if ((!isOwner && !isMaterial(id)) || quantity < 1) return;
 		const item = MARKET_ITEMS[id as MarketItemId];
 		try {
 			const res = await fetch("/api/hardware/buy", {
@@ -103,7 +107,7 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 			if (data.count !== undefined) {
 				useInventoryStore.getState().setItemCount(id, data.count);
 				const state = useGameStore.getState();
-				if (state.activeFarm) {
+				if (!isMaterial(id) && state.activeFarm) {
 					const field =
 						id === "fence"
 							? "fence_count"
@@ -223,6 +227,20 @@ export function useFarmMarket(target: string | undefined, isOwner: boolean) {
 							owned,
 							disabled: !isOwner || balance < item.price,
 							actionLabel: "Buy",
+							onAction: (quantity: number) =>
+								void buyHardware(itemId, quantity),
+						},
+					];
+				}
+				if (HARDWARE_MATERIALS.includes(item.id as ItemId)) {
+					const itemId = item.id as ItemId;
+					return [
+						item.id,
+						{
+							owned: countItem(inventory, itemId),
+							disabled: balance < item.price,
+							actionLabel: "Buy",
+							maxQuantity: 100,
 							onAction: (quantity: number) =>
 								void buyHardware(itemId, quantity),
 						},

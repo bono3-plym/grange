@@ -8,6 +8,7 @@ import {
 	ANIMATED_PROPS,
 	type MovablePropKey,
 	propBlocking,
+	propTemplate,
 	props,
 } from "./mapData";
 import { type PropPlacement, propPlacementReason } from "./propPlacement";
@@ -118,7 +119,9 @@ export class FarmPropLayer {
 		const carried = farm.prop_overrides
 			.filter((change) => change.carried && change.asset === asset)
 			.sort((a, b) => a.index - b.index)[0];
-		const original = carried ? props[carried.index] : props.find((prop) => prop.asset === asset);
+		const original = carried
+			? (props[carried.index] ?? propTemplate(asset))
+			: (props.find((prop) => prop.asset === asset) ?? propTemplate(asset));
 		if (!original || original.asset !== asset) return null;
 		const source = propImages[asset];
 		const height = (source.height * original.width) / source.width;

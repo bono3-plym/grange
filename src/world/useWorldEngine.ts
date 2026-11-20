@@ -47,10 +47,12 @@ interface SceneCallbacks {
 	setFishingOpen: (open: boolean) => void;
 	openHouseMenu: () => void;
 	openNpcTrade: () => void;
+	openBrewery: () => void;
 	openFarmTravelMenu: () => void;
 	openMarketplaceTravelMenu: () => void;
 	/** Publishes the live engine for canvas overlays such as lighting. */
 	onEngineChange?: (engine: ex.Engine | null) => void;
+	openRealtor: () => void;
 }
 
 /** Builds the Excalibur engine and its scenes for the world route. */
@@ -80,9 +82,11 @@ export function useWorldEngine(
 		setFishingOpen,
 		openHouseMenu,
 		openNpcTrade,
+		openBrewery,
 		openFarmTravelMenu,
 		openMarketplaceTravelMenu,
 		onEngineChange,
+		openRealtor,
 	} = options;
 
 	useEffect(() => {
@@ -117,6 +121,10 @@ export function useWorldEngine(
 			},
 			openHouseMenu,
 			openNpcTrade,
+			() => {
+				scene.setMenuPaused(true);
+				openBrewery();
+			},
 			openFarmTravelMenu,
 		);
 		scene.onFarmUpdate = (snapshot) => {
@@ -136,6 +144,10 @@ export function useWorldEngine(
 				setMarket(id);
 			},
 			openMarketplaceTravelMenu,
+			() => {
+				marketplace.setPaused(true);
+				openRealtor();
+			},
 		);
 		marketSceneRef.current = marketplace;
 		engine.addScene("marketplace", marketplace);
@@ -249,8 +261,10 @@ export function useWorldEngine(
 		setFishingOpen,
 		openHouseMenu,
 		openNpcTrade,
+		openBrewery,
 		openFarmTravelMenu,
 		openMarketplaceTravelMenu,
 		onEngineChange,
+		openRealtor,
 	]);
 }

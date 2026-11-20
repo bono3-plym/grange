@@ -1,0 +1,154 @@
+/* The realtor reuses the market window shell; these are its listing styles. */
+
+.market-window.realtor-window {
+	width: min(58rem, 100%);
+}
+
+.realtor-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+	gap: 1rem;
+	align-items: stretch;
+}
+
+.realtor-showcase {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 20rem;
+	border: 3px solid #2b1709;
+	border-radius: 0.2rem;
+	background: radial-gradient(circle at 50% 35%, #fff8e3 0%, #e4c891 72%, #d3b377 100%);
+	overflow: hidden;
+}
+
+.realtor-brewery {
+	width: 92%;
+	max-height: 22rem;
+	object-fit: contain;
+}
+
+.realtor-built {
+	position: absolute;
+	top: 0.7rem;
+	right: 0.7rem;
+	padding: 0.35rem 0.7rem;
+	border: 3px solid #2b1709;
+	border-radius: 0.2rem;
+	background: #7cb342;
+	color: #17300a;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	transform: rotate(-4deg);
+}
+
+.realtor-listing {
+	display: flex;
+	flex-direction: column;
+	gap: 0.7rem;
+	padding: 0.7rem;
+	border: 3px solid #2b1709;
+	border-radius: 0.2rem;
+	background: #d8c39e;
+	color: #2b1709;
+}
+
+.realtor-kicker {
+	margin: 0;
+	font-size: 0.68rem;
+	letter-spacing: 0.12em;
+	color: #8c3b2e;
+}
+
+.realtor-name {
+	margin: 0;
+	font-size: 1.7rem;
+	color: #2b1709;
+}
+
+.realtor-blurb {
+	margin: 0;
+	font-family: system-ui, sans-serif;
+	font-size: 0.88rem;
+	line-height: 1.4;
+}
+
+.realtor-requirements {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.realtor-requirements li {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	padding: 0.4rem 0.55rem;
+	border: 2px solid rgba(43, 23, 9, 0.3);
+	border-radius: 0.2rem;
+	background: #f4e6c5;
+	font-family: system-ui, sans-serif;
+	font-size: 0.82rem;
+}
+
+.realtor-requirements img {
+	width: 1.8rem;
+	height: 1.8rem;
+	object-fit: contain;
+	image-rendering: pixelated;
+}
+
+.realtor-requirements strong {
+	margin-left: auto;
+	font-family: "Rye", serif;
+	font-weight: normal;
+}
+
+.realtor-requirements .realtor-met {
+	border-color: #4f7a2a;
+	background: #cfe3b4;
+}
+
+.realtor-coin {
+	display: inline-flex;
+	width: 1.8rem;
+	justify-content: center;
+	font-size: 1rem;
+}
+
+.realtor-build {
+	margin-top: auto;
+	padding: 0.7rem 1rem;
+	border: 3px solid #2b1709;
+	border-radius: 0.2rem;
+	background: #7cb342;
+	color: #17300a;
+	font-family: "Rye", serif;
+	font-size: 0.95rem;
+	font-weight: 700;
+	cursor: pointer;
+	box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}
+
+.realtor-build:hover:not(:disabled) {
+	background: #8bc34a;
+}
+
+.realtor-build:disabled {
+	cursor: not-allowed;
+	filter: grayscale(0.7);
+	opacity: 0.65;
+}
+
+@media (max-width: 720px) {
+	.realtor-body {
+		grid-template-columns: 1fr;
+	}
+	.realtor-showcase {
+		min-height: 14rem;
+	}
+}

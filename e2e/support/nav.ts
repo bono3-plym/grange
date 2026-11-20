@@ -245,6 +245,12 @@ export async function walkToHardwareStore(page: Page): Promise<void> {
 	await walkUntilPrompt(page, ["d"], "shop at the hardware store");
 }
 
+/** Walks past the hardware stall to the realtor office. */
+export async function walkToRealtor(page: Page): Promise<void> {
+	await reachShopLane(page);
+	await walkUntilPrompt(page, ["d"], "visit the realtor", 20_000);
+}
+
 /** Walks from the marketplace spawn to the bank door. */
 export async function walkToBank(page: Page): Promise<void> {
 	await walkUntilPrompt(page, ["d"], "enter the bank", 15_000);

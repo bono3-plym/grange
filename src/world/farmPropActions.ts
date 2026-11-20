@@ -31,6 +31,10 @@ export function handleFarmPropClick(item: string | null, pos: Vector,
 			report("The train stays at the station.");
 			return true;
 		}
+		if (target.asset === "brewery" && useGameStore.getState().username !== owner) {
+			report("Only the farm owner can move the brewery.");
+			return true;
+		}
 		emitFarmPropAction(owner, { kind: "dig", index: target.index }, (result) =>
 			report(result.ok ? `${target.asset} moved to inventory.` :
 				result.error ?? "Could not dig up object."));

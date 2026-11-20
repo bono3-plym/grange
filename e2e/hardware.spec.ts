@@ -24,8 +24,10 @@ test("the hardware stall opens a market window and sells sprinklers", async ({
 	await expect(page.getByTestId("market-title")).toHaveText("Hardware Store");
 	await expect(page.getByTestId("farm-balance")).toContainText("100");
 
-	// Tools tab: you already own the starter tools, so they read as owned.
-	await expect(page.getByTestId("market-subtab-equipment")).toBeVisible();
+	// Materials are the default tab; switch to Tools, where the starter tools
+	// already read as owned.
+	await expect(page.getByTestId("market-subtab-materials")).toBeVisible();
+	await page.getByTestId("market-subtab-equipment").click();
 	await expect(page.getByTestId("market-owned-hoe")).toContainText("1");
 	await expect(page.getByTestId("market-action-hoe")).toBeDisabled();
 

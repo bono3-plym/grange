@@ -1,11 +1,12 @@
 defmodule Grange.Inventory do
   @moduledoc """
-  Account-scoped seed ledger and persisted hotbar/grid layout.
+  Account-scoped item ledger and persisted hotbar/grid layout.
 
-  Seeds are the part of the inventory the server must validate: purchases,
-  planting, and harvest drops all update `inventory_items`. The visual layout is
-  stored in `inventory_slots`; saves are allowed to move and split stacks but
-  may not contain more seeds than the ledger holds.
+  Seeds and building materials are the parts of the inventory the server must
+  validate: purchases, planting, hardware purchases, and real-estate builds all
+  update `inventory_items`. The visual layout is stored in `inventory_slots`;
+  saves may move and split stacks but may not contain more items than the
+  ledger holds.
   """
 
   import Ecto.Query
@@ -21,6 +22,8 @@ defmodule Grange.Inventory do
   }
 
   @seed_items ~w(seed-bag wheat-seed lettuce-seed midas-wheat-seed frost-lettuce-seed sunburst-tomato-seed)
+  @material_items ~w(wood-plank stone nails)
+  @ledger_items @seed_items ++ @material_items
   @animal_items ~w(cow hen sheep pig)
   @starter %{"seed-bag" => 10}
   @max_stack 99
@@ -61,9 +64,20 @@ defmodule Grange.Inventory do
     |> Map.new()
   end
 
-  @doc "Adds `count` of a seed, keeping the row when the result is zero."
+  @doc "Seed and material counts for `owner` (zeros included once a row exists)."
+  @spec holdings(String.t()) :: map()
+  def holdings(owner) do
+    from(i in InventoryItem,
+      where: i.owner == ^owner and i.item in ^@ledger_items,
+      select: {i.item, i.count}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  @doc "Adds `count` of a seed or material, keeping zero-count rows."
   @spec add(String.t(), String.t(), integer()) :: :ok
-  def add(owner, item, count) when item in @seed_items and is_integer(count) and count > 0 do
+  def add(owner, item, count) when item in @ledger_items and is_integer(count) and count > 0 do
     row = Repo.get_by(InventoryItem, owner: owner, item: item)
     held = if row, do: row.count, else: 0
     put_count(owner, item, held + count)
@@ -71,18 +85,24 @@ defmodule Grange.Inventory do
 
   def add(_owner, _item, _count), do: :ok
 
-  @doc "Spends `count` seeds, or fails when the owner holds too few."
+  @doc "Spends `count` seeds or materials, or fails when the owner holds too few."
   @spec take(String.t(), String.t(), integer()) :: :ok | {:error, String.t()}
-  def take(owner, item, count) when item in @seed_items and is_integer(count) and count > 0 do
+  def take(owner, item, count) when item in @ledger_items and is_integer(count) and count > 0 do
     case Repo.get_by(InventoryItem, owner: owner, item: item) do
       %InventoryItem{count: held} = row when held >= count ->
         row |> Ecto.Changeset.change(count: held - count) |> Repo.update!()
         :ok
 
+      _ when item in @material_items ->
+        {:error, "not enough materials"}
+
       _ ->
         {:error, "no seeds"}
     end
   end
+
+  def take(_owner, item, _count) when item in @material_items,
+    do: {:error, "not enough materials"}
 
   def take(_owner, _item, _count), do: {:error, "no seeds"}
 
@@ -124,6 +144,7 @@ defmodule Grange.Inventory do
   def save_layout(owner, slots) when is_list(slots) do
     with {:ok, normalized} <- normalize_slots(slots),
          :ok <- validate_seed_totals(owner, normalized),
+         :ok <- validate_material_totals(owner, normalized),
          :ok <- validate_animal_totals(owner, normalized),
          :ok <- replace_layout(owner, normalized) do
       {:ok, layout(owner)}
@@ -291,13 +312,22 @@ defmodule Grange.Inventory do
     end
   end
 
-  defp seed_totals(slots) do
-    Enum.reduce(slots, %{}, fn
-      %{item: item, count: count}, totals when item in @seed_items ->
-        Map.update(totals, item, count, &(&1 + count))
+  defp validate_material_totals(owner, slots) do
+    actual = totals(slots, @material_items)
+    expected = holdings(owner)
 
-      _slot, totals ->
-        totals
+    if Enum.all?(@material_items, &(Map.get(actual, &1, 0) <= Map.get(expected, &1, 0))) do
+      :ok
+    else
+      {:error, "material count mismatch"}
+    end
+  end
+
+  defp seed_totals(slots), do: totals(slots, @seed_items)
+
+  defp totals(slots, items) do
+    Enum.reduce(slots, %{}, fn %{item: item, count: count}, totals ->
+      if item in items, do: Map.update(totals, item, count, &(&1 + count)), else: totals
     end)
   end
 

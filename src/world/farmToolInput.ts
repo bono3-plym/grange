@@ -67,6 +67,8 @@ export class FarmToolInput {
 			const farm = useGameStore.getState().activeFarm;
 			if (item && isMovablePropAsset(item) && farm) {
 				if (!this.mayMoveProps()) return this.host.reportReadOnly();
+				if (item === "brewery" && useGameStore.getState().username !== this.host.owner)
+					return this.host.report("Only the farm owner can place the brewery.");
 				if ((farm.prop_inventory[item] ?? 0) > 0)
 					this.host.placement.start(item, evt.worldPos, this.host.player.pos, farm);
 				else this.host.report(`No ${item} in inventory.`);

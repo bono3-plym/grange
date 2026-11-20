@@ -21,4 +21,17 @@ describe("per-farm movable props", () => {
 		expect(placedFarmProps([{ index: 2, asset: "train", x: 0, y: 0, carried: true }])
 			.find(({ index }) => index === 2)?.asset).toBe("well");
 	});
+
+	it("renders a purchased brewery once it is placed", () => {
+		const carried = [{ index: 100, asset: "brewery", x: 0, y: 0, carried: true }];
+		expect(placedFarmProps(carried).some(({ index }) => index === 100)).toBe(false);
+
+		const placed = placedFarmProps([{ ...carried[0], x: 480, y: 400, carried: false }]);
+		expect(placed.find(({ index }) => index === 100)).toMatchObject({
+			asset: "brewery",
+			x: 480,
+			y: 400,
+			width: 250,
+		});
+	});
 });

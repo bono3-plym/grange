@@ -69,6 +69,7 @@ export type PropKey =
 	| "daisies"
 	| "marigolds"
 	| "blue-flowers"
+	| "brewery"
 	| "starter-train";
 
 export type MovablePropKey = Exclude<PropKey, "starter-train">;
@@ -86,6 +87,7 @@ export const MOVABLE_PROP_ASSETS: readonly MovablePropKey[] = [
 	"daisies",
 	"marigolds",
 	"blue-flowers",
+	"brewery",
 ];
 export const isMovablePropAsset = (asset: string): asset is MovablePropKey =>
 	MOVABLE_PROP_ASSETS.includes(asset as MovablePropKey);
@@ -216,6 +218,7 @@ export const propBlocking: Record<PropKey, PropBlockingRule> = {
 	daisies: "base",
 	marigolds: "base",
 	"blue-flowers": "base",
+	brewery: "rect",
 	"starter-train": "rect",
 };
 
@@ -240,3 +243,17 @@ export const props: MapProp[] = [
 	{ asset: "blue-flowers", x: 1015, y: 410, width: 50 },
 	{ asset: "daisies", x: 150, y: 475, width: 50 },
 ];
+
+/** Props bought after the starter layout; they are not part of `props`. */
+export const PURCHASABLE_PROP_TEMPLATES: Partial<
+	Record<MovablePropKey, MapProp>
+> = {
+	brewery: { asset: "brewery", x: 0, y: 0, width: 250 },
+};
+
+export function propTemplate(asset: MovablePropKey): MapProp | undefined {
+	return (
+		props.find((prop) => prop.asset === asset) ??
+		PURCHASABLE_PROP_TEMPLATES[asset]
+	);
+}

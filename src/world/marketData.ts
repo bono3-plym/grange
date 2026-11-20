@@ -22,7 +22,8 @@ export type MarketCategoryId =
 	| "rods"
 	| "supplies"
 	| "equipment"
-	| "build";
+	| "build"
+	| "materials";
 
 /**
  * A good that can be traded at a market. Produce ids double as crop ids, and
@@ -45,6 +46,9 @@ export type MarketItemId =
 	| "shovel"
 	| "fence"
 	| "gate"
+	| "wood-plank"
+	| "stone"
+	| "nails"
 	| FishId
 	| RodId;
 
@@ -153,6 +157,14 @@ export const MARKET_ITEMS = {
 	shovel: toolItem("shovel", "🧹", 40, "Dig up fences and objects."),
 	fence: toolItem("fence", "🪵", 5, "Click grass to place a fence post."),
 	gate: toolItem("gate", "🚪", 25, "Click grass to place a gate."),
+	"wood-plank": toolItem(
+		"wood-plank",
+		"🪵",
+		20,
+		"Sawn timber for building projects.",
+	),
+	stone: toolItem("stone", "🪨", 15, "Rough stone for foundations."),
+	nails: toolItem("nails", "🔨", 5, "Iron nails for timber work."),
 	...Object.fromEntries(FISH_ORDER.map((id) => [id, fishItem(id)])),
 	...Object.fromEntries(ROD_ORDER.map((id) => [id, rodItem(id)])),
 } as Record<MarketItemId, MarketItem>;
@@ -173,6 +185,13 @@ export const MARKET_CATEGORIES: Record<MarketCategoryId, MarketCategory> = {
 		label: "Seeds",
 		description: "Buy seeds to plant on your farm.",
 		items: ["wheat-seed", "lettuce-seed", "tomato-seed"],
+		slots: 8,
+	},
+	materials: {
+		id: "materials",
+		label: "Materials",
+		description: "Building supplies for real-estate projects.",
+		items: ["wood-plank", "stone", "nails"],
 		slots: 8,
 	},
 	tools: {
@@ -264,8 +283,8 @@ export const MARKETS: Record<MarketId, MarketDefinition> = {
 	hardware: {
 		id: "hardware",
 		title: "Hardware Store",
-		categories: ["equipment", "build", "supplies"],
-		defaultCategory: "equipment",
+		categories: ["materials", "equipment", "build", "supplies"],
+		defaultCategory: "materials",
 	},
 };
 

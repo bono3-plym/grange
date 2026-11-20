@@ -2,16 +2,24 @@ defmodule Grange.Hardware do
   @moduledoc """
   The hardware store catalogue and purchases.
 
-  Everything bought here is added to the farm's build supply (fences, gates,
-  sprinklers) rather than the seed ledger, so the client mirrors it exactly like
-  the existing supply counts. Tools (hoe, watering can, scythe, shovel) are
-  bought client-side and are not in this catalogue. Prices are
-  server-authoritative; the browser only renders them.
+  Building supplies (fences, gates, sprinklers) are added to the farm's supply
+  counts. Loose materials (wood planks, stone, nails) go into the account's item
+  ledger so they can be spent by the realtor. Tools are bought client-side and
+  are not in this catalogue. Prices are server-authoritative; the browser only
+  renders them.
   """
 
-  alias Grange.{FarmRecord, Repo, User}
+  alias Grange.{FarmRecord, Inventory, Repo, User}
 
-  @prices %{"sprinkler" => 75, "fence" => 5, "gate" => 25}
+  @material_items ~w(wood-plank stone nails)
+  @prices %{
+    "sprinkler" => 75,
+    "fence" => 5,
+    "gate" => 25,
+    "wood-plank" => 20,
+    "stone" => 15,
+    "nails" => 5
+  }
 
   @doc "Buy price in Grangecoin for an item id, or nil when it is not sold."
   @spec price(String.t()) :: pos_integer() | nil
@@ -25,8 +33,14 @@ defmodule Grange.Hardware do
   @spec buy(User.t(), String.t(), integer()) :: {:ok, map()} | {:error, String.t()}
   def buy(%User{} = user, item, quantity) when is_integer(quantity) and quantity > 0 do
     case price(item) do
-      nil -> {:error, "unknown item"}
-      unit -> purchase(user.id, user.username, item, quantity, unit * quantity)
+      nil ->
+        {:error, "unknown item"}
+
+      unit when item in @material_items ->
+        purchase_material(user.id, user.username, item, quantity, unit * quantity)
+
+      unit ->
+        purchase(user.id, user.username, item, quantity, unit * quantity)
     end
   end
 
@@ -38,6 +52,28 @@ defmodule Grange.Hardware do
       {:error, :insufficient_funds} -> {:error, "insufficient funds"}
       {:error, _reason} -> {:error, "purchase failed"}
     end
+  end
+
+  defp purchase_material(user_id, owner, item, quantity, cost) do
+    case Repo.transaction(fn -> apply_material(user_id, owner, item, quantity, cost) end) do
+      {:ok, result} -> {:ok, result}
+      {:error, :insufficient_funds} -> {:error, "insufficient funds"}
+      {:error, _reason} -> {:error, "purchase failed"}
+    end
+  end
+
+  defp apply_material(user_id, owner, item, quantity, cost) do
+    user = Repo.get!(User, user_id)
+
+    if user.balance < cost do
+      Repo.rollback(:insufficient_funds)
+    end
+
+    balance = user.balance - cost
+    user |> Ecto.Changeset.change(balance: balance) |> Repo.update!()
+    Inventory.add(owner, item, quantity)
+
+    %{balance: balance, item: item, count: Map.get(Inventory.holdings(owner), item, 0)}
   end
 
   defp apply_supply(user_id, owner, item, quantity, cost) do

@@ -22,8 +22,12 @@ defmodule GrangeWeb.InventoryController do
 
         seeds =
           if user.is_admin,
-            do: Inventory.grant_all_seeds(user.username),
-            else: Inventory.seeds(user.username)
+            do:
+              Map.merge(
+                Inventory.grant_all_seeds(user.username),
+                Inventory.holdings(user.username)
+              ),
+            else: Inventory.holdings(user.username)
 
         json(conn, %{
           ok: true,

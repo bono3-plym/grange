@@ -5,8 +5,10 @@ import {
 	MARKET_CATEGORIES,
 	MARKET_ITEMS,
 	type MarketCategoryId,
+	type MarketItem,
 	type MarketItemId,
 } from "./marketData";
+import { useEconomyBalance } from "./useEconomy";
 
 interface SeedCardProps {
 	entry: SeedStallEntry;
@@ -154,6 +156,67 @@ export function ProduceCard({ entry, control }: ProduceCardProps) {
 	);
 }
 
+interface BuyQuantityCardProps {
+	id: MarketItemId;
+	item: MarketItem;
+	control: MarketItemControl;
+}
+
+/** A buy card with a quantity field for bulk materials (e.g. 100 nails). */
+function BuyQuantityCard({ id, item, control }: BuyQuantityCardProps) {
+	const balance = useEconomyBalance();
+	const max = Math.max(1, Math.floor(control.maxQuantity ?? 1));
+	const [raw, setRaw] = useState(1);
+	const quantity = Math.min(max, Math.max(1, raw));
+	const cost = item.price * quantity;
+	const disabled = control.disabled || balance < cost;
+
+	return (
+		<article
+			className="market-generic-card"
+			data-testid={`market-item-${id}`}
+		>
+			{item.icon ? (
+				<img
+					className="market-generic-icon"
+					src={item.icon}
+					alt=""
+					aria-hidden="true"
+				/>
+			) : (
+				<span className="market-generic-emoji" aria-hidden="true">
+					{item.emoji}
+				</span>
+			)}
+			<span className="market-card-name">{item.name}</span>
+			<span className="market-card-price">{item.blurb}</span>
+			<span className="market-stock" data-testid={`market-owned-${id}`}>
+				Owned: {control.owned}
+			</span>
+			<label className="market-quantity">
+				<span>Qty</span>
+				<input
+					type="number"
+					min={1}
+					max={max}
+					value={quantity}
+					data-testid={`market-quantity-${id}`}
+					onChange={(event) => setRaw(Number(event.target.value) || 1)}
+				/>
+			</label>
+			<button
+				type="button"
+				className="market-btn market-btn-buy"
+				data-testid={`market-action-${id}`}
+				disabled={disabled}
+				onClick={() => control.onAction(quantity)}
+			>
+				{control.actionLabel} · {cost} GC
+			</button>
+		</article>
+	);
+}
+
 interface GenericCategoryGridProps {
 	categoryId: MarketCategoryId;
 	controls: Record<MarketItemId, MarketItemControl>;
@@ -180,7 +243,12 @@ export function GenericCategoryGrid({
 				{category.items.map((id) => {
 					const item = MARKET_ITEMS[id];
 					const control = controls[id];
-					const quantity = control.maxQuantity ?? item.quantity;
+					if ((control.maxQuantity ?? 1) > 1) {
+						return (
+							<BuyQuantityCard key={id} id={id} item={item} control={control} />
+						);
+					}
+					const quantity = item.quantity;
 					return (
 						<article
 							key={id}

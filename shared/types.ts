@@ -45,6 +45,25 @@ export interface FarmSprinkler {
 	y: number;
 }
 
+export type BreweryStatusKind = "idle" | "brewing";
+
+/** The owner's brewery batch state, sent with the farm view. */
+export interface BreweryStatus {
+	status: BreweryStatusKind;
+	input_item: string | null;
+	input_count: number;
+	output_item: string | null;
+	started_at: number | null;
+	ready_at: number | null;
+	last_output: string | null;
+	last_output_at: number | null;
+}
+
+export type BreweryAction =
+	| { kind: "insert"; item: string }
+	| { kind: "remove" }
+	| { kind: "start" };
+
 /** The full field and barn inventory for one farm. */
 export interface ActiveFarm {
 	owner: string;
@@ -83,6 +102,8 @@ export interface ActiveFarm {
 	prop_inventory: Record<string, number>;
 	/** Items stored in the barn's storage container. */
 	storage: Record<string, number>;
+	/** The owner's brewery batch state. */
+	brewery?: BreweryStatus | null;
 	/** The shared day/night clock snapshot, attached to every farm view. */
 	time?: WorldTime;
 	/** Convenience top-level mirrors of `time`, for simple UI checks. */

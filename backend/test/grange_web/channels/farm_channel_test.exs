@@ -4,7 +4,7 @@ defmodule GrangeWeb.FarmChannelTest do
 
   import Grange.FarmFixtures
 
-  alias Grange.{Accounts, Barn, Farm, FarmStore, Inventory, NpcQuest, Repo}
+  alias Grange.{Accounts, Barn, Farm, FarmProps, FarmStore, Inventory, NpcQuest, Repo}
   alias GrangeWeb.ChannelCase, as: Helper
   alias GrangeWeb.Presence
 
@@ -166,6 +166,17 @@ defmodule GrangeWeb.FarmChannelTest do
       signed_socket("Bob") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
 
     ref = push(socket, "farmPropAction", %{"action" => %{"kind" => "dig", "index" => 2}})
+    assert_reply(ref, :error, reply)
+    assert reply.error == "not your farm"
+  end
+
+  test "a visitor cannot move the brewery even when visitor editing is on" do
+    editable_farm("Alice")
+    assert :ok = FarmProps.grant("Alice", "brewery")
+
+    {:ok, _reply, socket} = join_farm("Bob", "Alice")
+
+    ref = push(socket, "farmPropAction", %{"action" => %{"kind" => "dig", "index" => 100}})
     assert_reply(ref, :error, reply)
     assert reply.error == "not your farm"
   end

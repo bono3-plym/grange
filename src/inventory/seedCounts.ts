@@ -1,4 +1,10 @@
 import { ITEMS, type ItemId, SEED_CROPS } from "./items";
+import { MATERIAL_ITEMS } from "./materialItems";
+
+const LEDGER_ITEMS: ItemId[] = [
+	...(Object.keys(SEED_CROPS) as ItemId[]),
+	...MATERIAL_ITEMS,
+];
 
 /** Minimal slot shape so this helper stays independent of the store module. */
 export interface SeedSlot {
@@ -10,10 +16,12 @@ function empty(): SeedSlot {
 	return { itemId: null, count: 0 };
 }
 
-function seedLimit(itemId: ItemId, raw: number): number {
-	const max = ITEMS[itemId].maxStack;
+function ledgerLimit(itemId: ItemId, raw: number): number {
 	if (!Number.isFinite(raw)) return 0;
-	return Math.min(max, Math.max(0, Math.floor(raw)));
+	const total = Math.max(0, Math.floor(raw));
+	// Seeds live in one stack, but materials may span several stacks (100 nails).
+	if ((MATERIAL_ITEMS as readonly string[]).includes(itemId)) return total;
+	return Math.min(ITEMS[itemId].maxStack, total);
 }
 
 /**
@@ -32,8 +40,8 @@ export function applySeedCounts(
 	const nextHotbar = hotbar.map((slot) => ({ ...slot }));
 	const areas = [nextHotbar, nextGrid];
 
-	for (const itemId of Object.keys(SEED_CROPS) as ItemId[]) {
-		const desired = seedLimit(itemId, Number(seeds[itemId] ?? 0));
+	for (const itemId of LEDGER_ITEMS) {
+		const desired = ledgerLimit(itemId, Number(seeds[itemId] ?? 0));
 		const current = areas
 			.flat()
 			.reduce(

@@ -15,12 +15,11 @@ import { useInventoryKeys } from "../inventory/useInventoryKeys";
 import { useInventoryPersistence } from "../inventory/useInventoryPersistence";
 import type { BankDesk, BankScene } from "./BankScene";
 import { BankWindow } from "./BankWindow";
-import { type CasinoOverlay, CasinoOverlays } from "./CasinoOverlays";
+import { BreweryPanel } from "./BreweryPanel"; import { type CasinoOverlay, CasinoOverlays } from "./CasinoOverlays";
 import type { CasinoScene } from "./CasinoScene";
 import { ComboCounter } from "./ComboCounter";
 import type { FarmMapScene } from "./FarmMapScene";
-import { FarmStatusHud } from "./FarmStatusHud";
-import { FishingOverlay } from "./FishingOverlay";
+import { FarmStatusHud } from "./FarmStatusHud"; import { FishingOverlay } from "./FishingOverlay";
 import type { FarmHudSnapshot } from "./farmHud";
 import { subscribeFarmPeers } from "./farmPresence";
 import "./farmMap.css";
@@ -32,17 +31,15 @@ import { LivestockPurchaseOverlay } from "./LivestockPurchaseOverlay";
 import type { MarketplaceScene } from "./MarketplaceScene";
 import { MarketWindow } from "./MarketWindow";
 import { MARKETS } from "./marketData";
+import { RealtorPanel } from "./RealtorPanel";
+import { useRealtor } from "./useRealtor"; import { useBrewery } from "./useBrewery";
 import { NpcTradeWindow } from "./NpcTradeWindow";
 import { SleepVoteToast } from "./SleepVoteToast";
 import { TravelMenu } from "./TravelMenu";
 import { useBarnReconcile } from "./useBarnReconcile";
 import { useFarmMarket } from "./useFarmMarket";
-import {
-	useFarmItemNotices,
-	useFarmObjectInventory,
-} from "./useFarmObjectInventory";
-import { useHouseMenu } from "./useHouseMenu";
-import { useLivestockPurchase } from "./useLivestockPurchase";
+import { useFarmItemNotices, useFarmObjectInventory } from "./useFarmObjectInventory";
+import { useHouseMenu } from "./useHouseMenu"; import { useLivestockPurchase } from "./useLivestockPurchase";
 import { useNpcTrade } from "./useNpcTrade";
 import { useWorldEngine } from "./useWorldEngine";
 import { useWorldTravel } from "./useWorldTravel";
@@ -143,6 +140,7 @@ export default function FarmMap() {
 	const [bankDesk, setBankDesk] = useState<BankDesk | null>(null);
 	const livestock = useLivestockPurchase(isOwner, username);
 	const { select: selectAnimal, setMessage: setLivestockMessage } = livestock;
+	const realtor = useRealtor(() => marketSceneRef.current?.setPaused(false)); const brewery = useBrewery(target, () => sceneRef.current?.setMenuPaused(false));
 	const [fishingOpen, setFishingOpen] = useState(false);
 	const [engineReady, setEngineReady] = useState(false);
 	const { houseOpen, openHouseMenu, closeHouseMenu } = useHouseMenu(sceneRef);
@@ -196,9 +194,10 @@ export default function FarmMap() {
 		setCasinoOverlay,
 		setFishingOpen,
 		openHouseMenu,
-		openNpcTrade: openNpc,
+		openNpcTrade: openNpc, openBrewery: brewery.openBrewery,
 		openFarmTravelMenu,
 		openMarketplaceTravelMenu,
+		openRealtor: realtor.openRealtor,
 		onEngineChange: setGameEngine,
 	});
 
@@ -288,6 +287,7 @@ export default function FarmMap() {
 					onClose={handleCloseMarket}
 				/>
 			)}
+			<RealtorPanel realtor={realtor} onClose={realtor.closeRealtor} /><BreweryPanel brewery={brewery} onClose={brewery.closeBrewery} />
 			{livestock.pen && (
 				<LivestockPurchaseOverlay
 					pen={livestock.pen}
@@ -311,7 +311,7 @@ export default function FarmMap() {
 				</div>
 			)}
 			{area === "Farm" && <FarmStatusHud hud={hud} />}
-			{!market && (!isOwner || inventoryHydrated) && (
+			{!market && !realtor.realtorOpen && (!isOwner || inventoryHydrated) && (
 				<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
 			)}
 			<ComboCounter />

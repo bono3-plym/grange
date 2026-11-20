@@ -45,6 +45,10 @@ Grange is a peaceful farming game with a hub world:
 - Start on your own farm with a run-down farmhouse, barn, fields, and a train.
 - Till, plant, water, and harvest crops. Crops can mutate into rare variants.
 - Buy seeds at the marketplace; sell produce from the barn.
+- Buy wood planks, stone, and nails at the hardware store; they stack in the
+  account inventory.
+- Visit the realtor on the marketplace to build a brewery from those materials.
+- Place the brewery and ferment 10 standard crops into beer or juice.
 - Take the train between your farm, the marketplace, and the casino.
 - Casino games (blackjack, poker, roulette, slots) spend and return
   Grangecoin.
@@ -246,7 +250,9 @@ auth is the `_grange_key` cookie; the socket uses the token instead.
 | POST | `/api/auth/logout` | cookie | Destroys the session, clears the cookie |
 | GET | `/api/auth/mailbox` | none | Dev/test only (`enable_test_routes`); returns the console mailer's last message for `?to=` |
 | POST | `/api/economy/transaction` | cookie | `{delta}` integer; clamped at zero |
-| POST | `/api/hardware/buy` | cookie | `{item, quantity}` → `{balance, sprinkler_count}` |
+| POST | `/api/hardware/buy` | cookie | `{item, quantity}` → `{balance, item, count}`. Supplies update the farm count; materials update the account ledger |
+| GET | `/api/realtor` | cookie | `{ok, catalog, owned, materials, balance}` |
+| POST | `/api/realtor/build` | cookie | `{property}` → spends materials + coin and returns `{balance, materials, owned}` |
 | GET | `/api/state` | none | `{playerCount, farmCount}` |
 | POST | `/api/reset` | none | Dev/test only; wipes accounts and farms |
 | POST | `/api/dev/npc` | cookie | Dev/test only; forces farmhand stage/counters and fills the barn |
@@ -300,6 +306,7 @@ Client events:
 | `gateAction` | `{action: {kind: "toggle_gate", x, y}}` | any joined user | `:ok` | `{error: reason}` |
 | `farmPropAction` | `{action: {kind: "dig", index} \| {kind: "place", asset, x, y}}` | owner, or visitor while `visitor_edit`, or any admin | `:ok` | `{error: reason}` |
 | `barnAction` | `{action: {kind: "deposit" \| "withdraw", item, count}}` | farm owner only | `:ok` | `{error: reason}` |
+| `breweryAction` | `{action: {kind: "insert", item} \| {kind: "remove"} \| {kind: "start"}}` | farm owner only | `{brewery, barn}` | `{error: reason}` |
 | `sellProduce` | `{item: cropId, count: integer}` | farm owner only | `:ok` | `{error: reason}` |
 | `npcIntroSeen` | `{}` | farm owner only | `{npc}` | `{error: reason}` |
 | `npcSell` | `{item: cropId}` | farm owner only | `{npc, balance}` | `{error: reason}` |
@@ -406,17 +413,19 @@ Market behavior:
 ### 5.9 World, scenes, and travel
 
 `src/world/FarmMap.tsx` creates one Excalibur `Engine` with viewport
-**1152×768** (`18 × 12` tiles of `64px`) and three scenes:
+**1152×768** (`18 × 12` tiles of `64px`) and five scenes:
 
 - `farm-map` → `FarmMapScene`
 - `marketplace` → `MarketplaceScene`
 - `casino` → `CasinoScene`
+- `livestock-market` → `LivestockMarketScene`
+- `bank` → `BankScene`
 
-`MarketplaceScene` and `CasinoScene` extend `WalkingScene`, which provides
-WASD/arrow movement, obstacle collision, `E`/`Enter` interactions, prompts, and
-scene travel. `FarmMapScene` is more specialized: farming tools, pointer
-painting, hover readout, fences/gates, prop placement, combo tracker, train
-animation, and travel to the marketplace.
+`MarketplaceScene`, `CasinoScene`, `LivestockMarketScene`, and `BankScene`
+extend `WalkingScene`, which provides WASD/arrow movement, obstacle collision,
+`E`/`Enter` interactions, prompts, and scene travel. `FarmMapScene` is more
+specialized: farming tools, pointer painting, hover readout, fences/gates, prop
+placement, combo tracker, train animation, and travel to the marketplace.
 
 The Excalibur engine is created as soon as the route has a farm target; the
 world only becomes interactive after the farm channel join supplies
@@ -555,6 +564,7 @@ single-use token machinery backs both email verification and password reset.
 │       ├── farmNpc / farmNpcPosition / npcQuest ← placeholder farmhand
 │       ├── NpcTradeWindow / useNpcTrade / npcStore / npcSocket
 │       ├── marketData / useFarmMarket / MarketWindow / seedShop
+│       ├── realtor* / RealtorWindow ← market-style brewery listing
 │       ├── blackjack*, poker*, roulette*, slots* ← client-side casino games
 │       ├── resources.ts / *Resources.ts ← Excalibur image sources
 │       ├── worldAssets.ts     ← per-scene image groups + lazy loading
@@ -580,6 +590,7 @@ single-use token machinery backs both email verification and password reset.
 │   │   ├── farm_fences.ex / farm_gates.ex / farm_props.ex
 │   │   ├── farm_gate_actions.ex ← visitor-safe gate toggle
 │   │   ├── npc_quest.ex / npc_quest_record.ex ← farmhand starter quest
+│   │   ├── realtor.ex / brewery.ex / brewing.ex ← real estate + brew batches
 │   │   ├── farm_record.ex / tile.ex / user.ex / session.ex
 │   │   └── farm_fence.ex / farm_gate.ex / farm_prop.ex
 │   ├── lib/grange_web/
@@ -623,12 +634,14 @@ single-use token machinery backs both email verification and password reset.
 | `farm_fences` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. |
 | `farm_gates` | `owner` FK, `x`, `y`, `direction`, `open` | Unique `(owner, x, y)`. `direction` is `horizontal` or `vertical`. |
 | `farm_sprinklers` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. `(x, y)` is the top-left tile of the watered 2x2; the object is drawn on that 2x2's shared corner. |
-| `farm_props` | `owner` FK, `source_index`, `asset`, `x`, `y`, `carried` | Unique `(owner, source_index)`. Indices map to the starter prop list. |
+| `farm_props` | `owner` FK, `source_index`, `asset`, `x`, `y`, `carried` | Unique `(owner, source_index)`. Indices 0–16 map to the starter prop list; index 100 is the realtor-granted brewery. |
 | `npc_quests` | `owner` FK, `stage`, `tomatoes_sold`, `lettuce_sold`, `wheat_sold` | One row per farm. `stage` is `intro`, `tomatoes`, `supplies`, or `complete`; counters cap at 10. |
+| `breweries` | `id`, `owner` FK, `property` default `brewery`, `status` default `idle`, `input_item`, `input_count`, `output_item`, `started_at`, `ready_at`, `last_output`, `last_output_at`, `inserted_at` | Unique `(owner, property)`. Ownership marker and one active brew state; the matching `farm_props` row is the placeable brewery. |
 
 All foreign keys cascade on farm delete. `Accounts.reset/0` deletes sessions
 then users; `FarmStore.reset/0` deletes tiles, barn items, fences, gates,
-sprinklers, props, farmhand quests, then farms.
+sprinklers, props, farmhand quests, then farms. `breweries` rows cascade with
+their farm.
 
 ### 7.2 Wire types (`shared/types.ts`)
 
@@ -703,6 +716,24 @@ export interface NpcQuestStatus {
 
 It arrives in the `farm:<owner>` join reply (owner only) and in every
 `npcIntroSeen` / `npcSell` ack.
+
+`BreweryStatus` rides on `ActiveFarm.brewery`:
+
+```ts
+export interface BreweryStatus {
+  status: "idle" | "brewing";
+  input_item: string | null;   // wheat, tomato, or lettuce
+  input_count: number;         // 0 or 10
+  output_item: string | null;  // beer, tomato_juice, or lettuce_juice
+  started_at: number | null;
+  ready_at: number | null;
+  last_output: string | null;
+  last_output_at: number | null;
+}
+```
+
+`breweryAction` acks return `{brewery, barn}` and the server also broadcasts a
+full `farmUpdate`.
 
 ### 7.3 Coordinates, units, and grids
 
@@ -868,6 +899,11 @@ chance = (0.0015 + (synergyActive ? 0.0025 : 0)) * comboMultiplier
   farm's supply counts) and sells the basic tools (hoe, watering can, scythe,
   shovel) as one-off purchases. The tools read as "Owned" because the starter
   hotbar already grants them.
+- The hardware store's **Materials** tab sells wood planks ($20), stone ($15),
+  and nails ($5). They are account-level `inventory_items` ledger rows, not farm
+  supply counts, and each stack holds 99; a 100-nail brewery order therefore
+  spans two stacks. Materials can be bought while visiting another farm because
+  they belong to the signed-in account.
 
 ### 8.6 Farm visibility and visitor editing
 
@@ -947,6 +983,37 @@ Rules live in `Grange.NpcQuest` (server, authoritative) and `src/world/npcQuest.
 never moves quest counters or barn counts itself. `FarmNpc` follows the live
 farmhouse prop position (`x + 145, y + 40`) and hides when the house is packed
 into the inventory. See `notes/npc-tutorial.md`.
+
+### 8.9 Realtor and brewery construction
+
+The marketplace has a realtor building east of the hardware store, joined to the
+shop lane by the column-26 path. Walking up and pressing `E` opens the
+`RealtorWindow` directly, the same way the seed, produce, and hardware stalls
+open their market windows; there is no separate interior scene. The only
+listing is the **Brewery**:
+
+- cost: 20 wood planks, 20 stone, 100 nails, and 5,000 Grangecoin;
+- all four are checked atomically by `Grange.Realtor.build/2`, which spends the
+  account ledger and coin, inserts a `breweries` row, and grants a carried
+  `brewery` prop (source index 100) in the owner's `farm_props`;
+- an account can own one brewery, and the window shows a `BUILT` badge on later
+  visits.
+
+The client never deducts materials itself: the `/api/realtor/build` response
+returns the authoritative balance/materials/owned/prop-inventory state, which
+the window applies to the wallet and inventory. The brewery is a normal
+movable building: select it from the hotbar and place it on the owner's home
+farm. Its dig/place actions are owner-only even when `visitor_edit` is on, so a
+visitor cannot move it.
+
+Once placed, standing within `BREWERY_REACH` (150px) of its base and pressing
+`E` opens the `BreweryWindow`. The owner can insert 10 standard wheat, tomato,
+or lettuce from the barn; rare mutant crops are rejected with an explanation.
+`Start brew` records `started_at`/`ready_at` (`Grange.Brewing.brew_ms/0`, one
+hour in normal play, shortened by `GRANGE_BREW_MS` in e2e). The farm tick calls
+`Brewing.finish_due/1`, which adds one finished drink to the barn and clears the
+batch. Outputs are `beer`, `tomato_juice`, and `lettuce_juice`; `barnSync`
+mirrors them into the inventory. Brewery actions are owner-only channel events.
 
 ---
 
@@ -1098,6 +1165,8 @@ reason (the repo already has one for a deliberate hook dependency).
   - `GRANGE_GROW_MS=100` → `Farm.grow_ms/0`: a crop ripens in 100ms, not 10s.
   - `GRANGE_TICK_MS=100` → the `FarmTicker` sweep interval, so a watered crop is
     ready on the next sweep instead of the next second.
+  - `GRANGE_BREW_MS=100` → `Brewing.brew_ms/0`: a brewery batch finishes on the
+    next sweep instead of after an hour.
   - `GRANGE_FAST_HASH=1` → the cheap Argon2 parameters `test.exs` uses. The
     suite registers ~50 accounts, and production hashing is a measurable slice
     of that.
@@ -1410,6 +1479,17 @@ runs Gitleaks.
     `GLIBC_2.43`, `beam.smp` refused to start, and every deploy failed its
     health check while nginx served 502. Do not switch the deploy workflows
     back to `ubuntu-latest`; pick the newest image the hosts can load.
+41. **Materials are account-level ledger items, not farm supplies.** Wood
+    planks, stone, and nails live in `inventory_items` beside seeds; they are
+    spent by `Grange.Realtor`, not by farm channels. Their total is allowed to
+    exceed 99 (a brewery needs 100 nails) and the layout stores them across
+    multiple 99-item stacks. A hardware purchase from a guest farm still updates
+    the signed-in account, not the visited farm.
+42. **The brewery is a purchased prop, not a farm-supply count.** The realtor
+    grants a carried `farm_props` row at source index 100; placing and digging
+    it uses the normal movable-prop flow. `FarmProps.owner_only?/1` routes those
+    actions through `authorize_owner`, so visitors and admins cannot move it even
+    on an editable farm.
 
 ---
 
@@ -1439,6 +1519,8 @@ them silently as part of an unrelated change; mention them in the PR.
 
 - Settings, whitelist management, and some market tabs (`tools`, `train`) are
   stubs.
+- Brewery outputs (`beer`, `tomato_juice`, `lettuce_juice`) have no market
+  listing yet, so they can be owned but not sold.
 - Rare mutation seeds are persisted server-side, but Sun-Burst Tomato's extra
   10% seed is declared and never rolled.
 - Server-side passive watering for Frost-Crisp Lettuce is not implemented, and
